@@ -1,0 +1,25 @@
+from fastapi import APIRouter
+from app.models.schemas import InventoryChange, InventoryUpdate
+from app.services import inventory_service
+
+router = APIRouter(prefix="/inventory", tags=["Inventory"])
+
+@router.get("/")
+async def get_inventory():
+    """List current stock levels for all products."""
+    return await inventory_service.get_all_inventory()
+
+@router.get("/{product_id}")
+async def get_inventory_item(product_id: str):
+    """Get specific stock info for a product."""
+    return await inventory_service.get_inventory_by_product(product_id)
+
+@router.post("/update")
+async def change_stock(update_data: InventoryChange):
+    """Increment/decrement stock by a change amount."""
+    return await inventory_service.update_stock(update_data)
+
+@router.patch("/{product_id}")
+async def patch_stock(product_id: str, data: InventoryUpdate):
+    """Update absolute stock_quantity for a product."""
+    return await inventory_service.set_inventory_stock(product_id, data)
