@@ -1,13 +1,15 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-// Bileşen Importları
+// Marketplace Bileşenleri
 import Navbar from './components/marketplace/Navbar';
 import Hero from './components/marketplace/Hero';
 import CategoryGrid from './components/marketplace/CategoryGrid';
 import ProductGrid from './components/marketplace/ProductGrid';
 import CartView from './components/marketplace/CartView';
 import AuthPages from './components/auth/AuthPages';
+
+// Dashboard Bileşenleri
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import AdminView from './components/dashboard/AdminView';
@@ -18,24 +20,24 @@ type Role = 'admin' | 'kayıtlıuser';
 type ViewMode = 'home' | 'panel' | 'cart';
 
 export default function SmartOpsDashboard() {
-  // --- TEMEL STATE'LER ---
+  // --- STATE YÖNETİMİ ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
   const [showAuth, setShowAuth] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'signup' | 'guest'>('login');
-  const [role, setRole] = useState<Role>('admin'); // Test için varsayılan admin
+  const [role, setRole] = useState<Role>('admin'); 
+  
   const [currentView, setCurrentView] = useState<ViewMode>('home');
   const [activeTab, setActiveTab] = useState('panel');
   const [isReady, setIsReady] = useState(false);
 
-  // --- SEPET STATE'İ ---
+  // SEPET DURUMU
   const [cart, setCart] = useState<any[]>([]);
 
   useEffect(() => { setIsReady(true); }, []);
   if (!isReady) return null;
 
-  // --- FONKSİYONLAR ---
-  
+  // --- SEPET FONKSİYONLARI ---
   const handleAddToCart = (product: any) => {
     setCart((prev) => {
       const existing = prev.find(item => item.id === product.id);
@@ -50,7 +52,7 @@ export default function SmartOpsDashboard() {
     setCart((prev) => prev.filter(item => item.id !== productId));
   };
 
-  // Veritabanına (FastAPI) Sipariş Gönderme
+  // --- BACKEND API'YE SİPARİŞ GÖNDERME ---
   const submitOrderToDB = async (customerData: any) => {
     const total_amount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
@@ -61,26 +63,27 @@ export default function SmartOpsDashboard() {
         body: JSON.stringify({
           items: cart,
           total_amount: total_amount,
-          ...customerData // isim, email, tel, adres, user_id buraya yayılır
+          ...customerData // full_name, email, phone, address, user_id buraya aktarılır
         })
       });
 
       if (response.ok) {
-        alert("Siparişiniz başarıyla alındı ve veritabanına kaydedildi!");
-        setCart([]);
+        alert("Siparişiniz başarıyla alındı ve operasyon merkezimize iletildi!");
+        setCart([]); // Sipariş tamamlanınca sepeti boşalt
         setShowAuth(false);
         setCurrentView('home');
       } else {
-        alert("Sipariş sırasında bir hata oluştu.");
+        const errorData = await response.json();
+        alert(`Sipariş sırasında bir hata oluştu: ${errorData.detail}`);
       }
     } catch (error) {
       console.error("Bağlantı Hatası:", error);
-      alert("Backend sunucusuna bağlanılamadı.");
+      alert("Sunucu ile bağlantı kurulamadı.");
     }
   };
 
   // =========================================================================
-  // GÖRÜNÜM 1: MARKETPLACE (Anasayfa veya Sepet)
+  // GÖRÜNÜM 1: MARKETPLACE VİTRİNİ VE SEPET EKRANI
   // =========================================================================
   if (currentView === 'home' || currentView === 'cart') {
     return (
@@ -113,11 +116,11 @@ export default function SmartOpsDashboard() {
                   setAuthView('login'); 
                   setShowAuth(true); 
                 } else { 
-                  // Kayıtlı kullanıcı doğrudan sipariş geçer
+                  // KAYITLI KULLANICI SİPARİŞİ
                   submitOrderToDB({ 
-                    user_id: "user-uuid-buraya", // Gerçek sistemde auth'tan gelir
+                    user_id: "kayitli-kullanici-uuid-si", // İleride gerçek auth bağlandığında güncellenir
                     full_name: userName,
-                    email: userName + "@example.com" 
+                    email: userName + "@smartops.com" // Şimdilik dummy email
                   });
                 }
               }}
@@ -127,14 +130,33 @@ export default function SmartOpsDashboard() {
 
         {showAuth && (
            <AuthPages 
-             role={role} setRole={setRole} initialView={authView} 
+             role={role} 
+             setRole={setRole} 
+             initialView={authView} 
              allowGuest={currentView === 'cart'} 
              onClose={() => setShowAuth(false)} 
+             
+             // GİRİŞ YAPAN KULLANICILAR İÇİN
              onLogin={(email: string) => { 
-               setIsLoggedIn(true); setUserName(email.split('@')[0]); setShowAuth(false);
-               if(currentView === 'cart') submitOrderToDB({ email, full_name: email.split('@')[0] });
+               setIsLoggedIn(true); 
+               setUserName(email.split('@')[0]); 
+               setShowAuth(false); 
+               
+               if(currentView === 'cart') {
+                 submitOrderToDB({ email: email, full_name: email.split('@')[0] });
+               }
              }} 
-             onGuestCheckout={(guestData: any) => submitOrderToDB(guestData)}
+
+             // ÜYELİKSİZ (MİSAFİR) SİPARİŞİ TAMAMLAYANLAR İÇİN
+             onGuestCheckout={(guestData: any) => {
+               // Frontend'deki camelCase veriyi, Backend'in beklediği snake_case'e çeviriyoruz
+               submitOrderToDB({
+                 full_name: guestData.fullName,
+                 email: guestData.email,
+                 phone: guestData.phone,
+                 address: guestData.address
+               });
+             }}
           />
         )}
       </div>
@@ -152,6 +174,7 @@ export default function SmartOpsDashboard() {
           ← Mağazaya Geri Dön
         </button>
         <Header role={role} />
+        
         <div className="mt-8">
           {activeTab === 'panel' ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> ) 
           : activeTab === 'add-product' ? ( <AddProductView /> )
@@ -159,12 +182,12 @@ export default function SmartOpsDashboard() {
             <div className="space-y-8 animate-in fade-in duration-500">
               <h2 className="text-3xl font-black italic uppercase tracking-tighter">Siparişlerim</h2>
               <div className="bg-slate-50 p-20 rounded-[48px] text-center border-2 border-dashed border-slate-200">
-                <p className="text-slate-400 font-bold uppercase text-xs">Aktif sipariş bulunmuyor.</p>
+                <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Sipariş bulunmuyor.</p>
               </div>
             </div>
           ) : (
              <div className="p-20 text-center border-2 border-dashed border-slate-100 rounded-[48px]">
-               <h2 className="text-2xl font-black text-slate-300 uppercase">{activeTab.toUpperCase()}</h2>
+               <h2 className="text-2xl font-black text-slate-300 uppercase tracking-widest">{activeTab.toUpperCase()} Modülü</h2>
              </div>
           )}
         </div>

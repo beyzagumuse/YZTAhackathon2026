@@ -1,11 +1,12 @@
 import os
+import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
 
-# Supabase ve Gemini servisleri (Kendi yollarınıza göre import edin)
+# Kendi yolunuza göre içe aktarın (Örnek yollar)
 from app.core.supabase_client import supabase_client
 from app.agents.gemini_service import ask_ai
 
@@ -13,16 +14,17 @@ load_dotenv()
 
 app = FastAPI(title="SmartOps Cooperative API")
 
-# CORS AYARLARI
+# --- CORS AYARLARI ---
+# Next.js'in API'mize sorunsuzca istek atabilmesi için
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # Frontend adresi
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- ŞEMALAR (Sipariş için) ---
+# --- Pydantic Modelleri (Şemalar) ---
 class OrderItem(BaseModel):
     id: int
     name: str
@@ -38,7 +40,6 @@ class CheckoutRequest(BaseModel):
     address: Optional[str] = None
     user_id: Optional[str] = None
 
-# --- ŞEMALAR (Chat için) ---
 class ChatRequest(BaseModel):
     message: str
 
@@ -46,7 +47,15 @@ class ChatRequest(BaseModel):
 @app.post("/checkout/")
 async def create_order(order: CheckoutRequest):
     try:
-        # 1. Ana Sipariş Kaydı
+        # 1. Eksik Alan Validasyonu
+        if not order.email or not order.full_name:
+            raise HTTPException(status_code=400, detail="E-posta ve İsim alanları zorunludur!")
+
+        # 2. Misafir Kullanıcıya Otomatik Benzersiz ID Ataması
+        if not order.user_id:
+            order.user_id = str(uuid.uuid4())
+
+        # 3. Ana Sipariş (orders) Payload Hazırlığı
         order_payload = {
             "total_amount": order.total_amount,
             "guest_name": order.full_name,
@@ -57,10 +66,15 @@ async def create_order(order: CheckoutRequest):
             "status": "Hazırlanıyor"
         }
         
+        # Supabase 'orders' tablosuna kayıt
         response = supabase_client.table("orders").insert(order_payload).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Sipariş kaydedilirken Supabase'den boş yanıt döndü.")
+            
         new_order_id = response.data[0]['id']
 
-        # 2. Sipariş Kalemleri Kaydı
+        # 4. Sipariş Edilen Ürünlerin (order_items) Payload Hazırlığı
         items_payload = []
         for item in order.items:
             items_payload.append({
@@ -71,12 +85,14 @@ async def create_order(order: CheckoutRequest):
                 "price": item.price
             })
         
+        # Supabase 'order_items' tablosuna kayıt
         supabase_client.table("order_items").insert(items_payload).execute()
 
-        return {"status": "success", "order_id": new_order_id}
+        return {"status": "success", "order_id": new_order_id, "message": "Sipariş veritabanına başarıyla işlendi."}
 
     except Exception as e:
-        print(f"Hata: {e}")
+        print(f"Backend Kayıt Hatası: {e}")
+        # Hata mesajını frontend'e iletmek için HTTPException kullanıyoruz
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- ENDPOINT: AI CHAT ---
@@ -88,9 +104,10 @@ async def chat_with_ai(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- Sağlık Kontrolü ---
 @app.get("/")
 async def root():
-    return {"message": "SmartOps API is online"}
+    return {"message": "SmartOps API is running smoothly!"}
 
 if __name__ == "__main__":
     import uvicorn
