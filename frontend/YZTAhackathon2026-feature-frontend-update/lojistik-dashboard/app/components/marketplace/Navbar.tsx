@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Search, User, Heart, MapPin, UserPlus, Box, MessageSquare, Ticket, Coins, LogOut, ChevronDown } from 'lucide-react';
+import { ShoppingBag, Search, User, Heart, MapPin, UserPlus, Box, MessageSquare, Ticket, Coins, LogOut, ChevronDown, ShoppingCart } from 'lucide-react';
 
-export default function Navbar({ isLoggedIn, userName, onAuthClick, onLogout, onNavigateToPanel }: any) {
+export default function Navbar({ isLoggedIn, userName, cartCount = 0, onAuthClick, onLogout, onNavigateToPanel, onCartClick, onHomeClick }: any) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -18,40 +18,32 @@ export default function Navbar({ isLoggedIn, userName, onAuthClick, onLogout, on
 
       <nav className="px-12 py-5 flex justify-between items-center relative">
         <div className="flex items-center gap-10">
-          <div className="font-black text-2xl italic tracking-tighter text-blue-600 flex items-center gap-2 cursor-pointer">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white"><ShoppingBag size={20}/></div>
+          {/* Logo - Tıklanınca Anasayfaya Döner */}
+          <div onClick={onHomeClick} className="font-black text-2xl italic tracking-tighter text-emerald-600 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white"><ShoppingBag size={20}/></div>
             SMARTOPS <span className="text-slate-800">KOOPERATİF</span>
           </div>
           <div className="hidden md:flex relative w-[400px]">
-            <input type="text" placeholder="Ürün veya kooperatif ara..." className="w-full bg-slate-100 rounded-full py-2.5 px-6 pl-12 text-sm outline-none focus:ring-2 ring-blue-100 transition-all"/>
+            <input type="text" placeholder="Ürün veya kooperatif ara..." className="w-full bg-slate-100 rounded-full py-2.5 px-6 pl-12 text-sm outline-none focus:ring-2 ring-emerald-100 transition-all"/>
             <Search className="absolute left-4 top-2.5 text-slate-400" size={18} />
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {!isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <button 
-                onClick={() => onAuthClick('login')} 
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl hover:bg-slate-50 text-slate-600 transition-all font-bold text-xs uppercase"
-              >
+              <button onClick={() => onAuthClick('login')} className="flex items-center gap-2 px-5 py-2.5 rounded-xl hover:bg-slate-50 text-slate-600 transition-all font-bold text-xs uppercase">
                 <User size={18} /> Giriş Yap
               </button>
               <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>
-              <button 
-                onClick={() => onAuthClick('signup')} 
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all font-black text-xs uppercase"
-              >
+              <button onClick={() => onAuthClick('signup')} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all font-black text-xs uppercase">
                 <UserPlus size={18} /> Kayıt Ol
               </button>
             </div>
           ) : (
             <div className="relative">
-              <button 
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all border border-slate-100"
-              >
-                <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-black text-[10px]">
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all border border-slate-100">
+                <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-black text-[10px]">
                   {userName?.charAt(0).toUpperCase()}
                 </div>
                 <div className="text-left">
@@ -61,33 +53,38 @@ export default function Navbar({ isLoggedIn, userName, onAuthClick, onLogout, on
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Açılır Menü (Dropdown) */}
               {isMenuOpen && (
                 <div className="absolute right-0 mt-3 w-64 bg-white rounded-[24px] shadow-2xl border border-slate-100 py-4 z-50 animate-in fade-in zoom-in-95 duration-200">
                   <div className="px-2 space-y-1">
-                    <button onClick={onNavigateToPanel} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 rounded-xl text-slate-700 text-left transition-colors">
-                      <Box size={18} className="text-slate-400" />
-                      <span className="text-sm font-bold tracking-tight">Tüm Siparişlerim</span>
+                    <button onClick={() => { onNavigateToPanel(); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 rounded-xl text-slate-700 text-left transition-colors">
+                      <Box size={18} className="text-slate-400" /> <span className="text-sm font-bold tracking-tight">Tüm Siparişlerim</span>
                     </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 rounded-xl text-slate-700 text-left transition-colors">
-                      <MessageSquare size={18} className="text-slate-400" />
-                      <span className="text-sm font-bold tracking-tight">Satıcı Mesajlarım</span>
-                    </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 rounded-xl text-slate-700 text-left transition-colors">
-                      <Ticket size={18} className="text-slate-400" />
-                      <span className="text-sm font-bold tracking-tight">İndirim Kuponlarım</span>
+                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 rounded-xl text-slate-700 text-left transition-colors">
+                      <MessageSquare size={18} className="text-slate-400" /> <span className="text-sm font-bold tracking-tight">Satıcı Mesajlarım</span>
                     </button>
                     <div className="h-[1px] bg-slate-100 my-2 mx-4"></div>
                     <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 rounded-xl text-rose-600 text-left transition-colors">
-                      <LogOut size={18} />
-                      <span className="text-sm font-bold tracking-tight">Çıkış Yap</span>
+                      <LogOut size={18} /> <span className="text-sm font-bold tracking-tight">Çıkış Yap</span>
                     </button>
                   </div>
                 </div>
               )}
             </div>
           )}
-          <Heart size={22} className="text-slate-400 cursor-pointer hover:text-rose-500 transition-colors ml-2" />
+          
+          <div className="flex items-center gap-4 ml-2 pl-4 border-l border-slate-200">
+            <Heart size={22} className="text-slate-400 cursor-pointer hover:text-rose-500 transition-colors" />
+            
+            {/* SEPET İKONU VE SAYICI */}
+            <button onClick={onCartClick} className="relative p-2 text-slate-600 hover:text-emerald-600 transition-colors group">
+              <ShoppingCart size={24} className="group-hover:scale-110 transition-transform" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 text-white text-[10px] rounded-full flex items-center justify-center font-black shadow-sm">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </nav>
     </div>
