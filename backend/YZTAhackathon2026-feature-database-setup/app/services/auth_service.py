@@ -3,7 +3,7 @@ from app.models.schemas import UserSignup, UserLogin
 from app.core.supabase_client import supabase_client
 
 async def signup(user_data: UserSignup):
-    # Supabase Auth üzerinden kayıt (Aynı e-posta varsa Supabase hata fırlatır)
+    # Supabase Auth üzerinden kayıt
     try:
         auth_response = supabase_client.auth.sign_up({
             "email": user_data.email,
@@ -12,41 +12,37 @@ async def signup(user_data: UserSignup):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Signup failed: {str(e)}")
 
-    # Eğer e-posta daha önce kullanılmışsa veya auth başarısızsa
     if not auth_response.user:
         raise HTTPException(status_code=400, detail="Signup failed. Email might already be in use.")
 
     user_id = auth_response.user.id
 
-    # Profiller tablosuna ekstra bilgileri ekle (TC no çıkarıldı)
+    # Profiller tablosuna ekstra bilgileri (role dahil) ekle
     try:
         supabase_client.table("profiles").insert({
             "id": user_id,
             "full_name": user_data.full_name,
-            "email": user_data.email  # İleride sorgulama kolaylığı için email'i profilde de tutabiliriz
+            "email": user_data.email,
+            "role": user_data.role  # EKLENDİ
         }).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create user profile: {str(e)}")
 
-    # --- SHADOW PROFILE (MİSAFİR SİPARİŞ) AKTARIM MANTIĞI ---
+    # Shadow Profile (Misafir Sipariş) Aktarım Mantığı
     try:
-        # Eğer bu e-posta adresiyle daha önce verilmiş misafir siparişler varsa, asıl hesaba bağla
         supabase_client.table("orders") \
             .update({"customer_id": user_id}) \
             .eq("guest_email", user_data.email) \
             .execute()
         
-        # Kullanıcı artık üye olduğu için shadow profile (misafir) kaydını sil (Temizlik)
         supabase_client.table("shadow_profiles") \
             .delete() \
             .eq("email", user_data.email) \
             .execute()
     except Exception as e:
-        # Kayıt başarılı olduğu için sipariş aktarım hatasını sadece logluyoruz
         print(f"Shadow profile merge failed for {user_data.email}: {e}")
 
     return {"message": "User signed up successfully", "user_id": user_id}
-
 
 async def login(user_data: UserLogin):
     try:
@@ -58,13 +54,12 @@ async def login(user_data: UserLogin):
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-
 async def create_shadow_profile(session_id: str, email: str = None, phone: str = None, ip_address: str = None, user_agent: str = None):
     try:
         response = supabase_client.table("shadow_profiles").insert({
             "session_id": session_id,
-            "email": email,      # E-posta eklendi
-            "phone": phone,      # Telefon eklendi
+            "email": email,      
+            "phone": phone,      
             "ip_address": ip_address,
             "user_agent": user_agent
         }).execute()

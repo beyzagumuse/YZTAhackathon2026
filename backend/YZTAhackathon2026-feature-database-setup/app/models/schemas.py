@@ -6,6 +6,7 @@ class UserSignup(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     full_name: str
+    role: str = "kayıtlıuser"  # EKLENDİ: admin, kayıtlıuser veya anonimuser
 
     @field_validator("password")
     @classmethod
@@ -27,15 +28,14 @@ class UserLogin(BaseModel):
 # --- Profiles ---
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
-    # email is excluded by business logic
 
 # --- Products ---
 class ProductCreate(BaseModel):
     name: str
     description: Optional[str] = None
     price: float
-    stock_quantity: int = 0         # Lidl Mantığı: Başlangıç stoğu
-    min_threshold: int = 10         # Lidl Mantığı: Stok uyarısı için kritik eşik
+    stock_quantity: int = 0         
+    min_threshold: int = 10         
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -64,12 +64,12 @@ class OrderCreate(BaseModel):
     customer_id: str
 
 class OrderUpdate(BaseModel):
-    status: str  # e.g., "pending", "shipped", "delivered"
+    status: str  
 
 # --- Shadow Profiles (Misafir Kullanıcı) ---
 class ShadowProfileCreate(BaseModel):
     session_id: str
-    email: Optional[EmailStr] = None # Sipariş aktarımı için gerekli
+    email: Optional[EmailStr] = None 
     phone: Optional[str] = None
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
