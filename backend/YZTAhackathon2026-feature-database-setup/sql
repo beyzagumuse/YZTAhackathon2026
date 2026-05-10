@@ -1,0 +1,119 @@
+-- 1. UUID Uzantısını Aktif Et
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ==========================================
+-- TABLOLARIN OLUŞTURULMASI
+-- ==========================================
+
+-- 1. ADMİNLER TABLOSU 
+CREATE TABLE IF NOT EXISTS admins (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL, -- Backend çift kontrolü için düz metin veya hash
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- İlk Admin Hesabını Ekle
+INSERT INTO admins (full_name, email, password)
+VALUES ('Sistem Yöneticisi', 'admin@koop.com', '123456')
+ON CONFLICT (email) DO NOTHING;
+
+-- 2. PROFİLLER (Normal Kayıtlı Kullanıcılar)
+CREATE TABLE IF NOT EXISTS profiles (
+    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    address TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- 3. GÖLGE PROFİLLER (Misafir Kullanıcılar)
+CREATE TABLE IF NOT EXISTS shadow_profiles (
+    session_id TEXT PRIMARY KEY,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- 4. ÜRÜNLER (Products)
+CREATE TABLE IF NOT EXISTS products (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- 5. STOK DURUMU (Inventory)
+CREATE TABLE IF NOT EXISTS inventory (
+    product_id UUID REFERENCES products(id) ON DELETE CASCADE PRIMARY KEY,
+    quantity INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- 6. SİPARİŞLER (Orders)
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    customer_id TEXT NOT NULL, -- shadow_profile session_id veya profile UUID
+    total_amount DECIMAL(10, 2) NOT NULL,
+    status TEXT DEFAULT 'pending',
+    address TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- 7. SİPARİŞ DETAYLARI (Order Items)
+CREATE TABLE IF NOT EXISTS order_items (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES products(id) ON DELETE RESTRICT,
+    quantity INT NOT NULL,
+    unit_price_at_sale DECIMAL(10, 2) NOT NULL
+);
+
+-- 8. KARGO / SEVKİYAT (Shipment)
+CREATE TABLE IF NOT EXISTS shipments (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    carrier_name TEXT,
+    tracking_number TEXT,
+    status TEXT,
+    estimated_delivery TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- ==========================================
+-- OTOMATİK PROFİL OLUŞTURUCU (Trigger)
+-- ==========================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, address)
+  VALUES (
+    new.id,
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'address'
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger'ı bağla
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- ==========================================
+-- GÜVENLİK (RLS) AYARLARI
+-- ==========================================
+-- Backend'in (FastAPI) yetkilendirme hataları almaması için RLS'leri devre dışı bırakıyoruz.
+
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE shadow_profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory DISABLE ROW LEVEL SECURITY;
+ALTER TABLE orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE shipments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE admins DISABLE ROW LEVEL SECURITY;

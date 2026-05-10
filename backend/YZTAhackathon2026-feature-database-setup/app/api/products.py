@@ -2,29 +2,32 @@ from fastapi import APIRouter, status
 from app.models.schemas import ProductCreate, ProductUpdate
 from app.services import product_service
 
+# Prefix "/products" olarak tanımlandı
 router = APIRouter(prefix="/products", tags=["Products"])
 
+# Hata Çözümü: Hem "/products" hem de "/products/" isteklerini karşılamak için çift dekoratör kullanıyoruz
+@router.get("")
 @router.get("/")
 async def list_products():
-    """List all products."""
+    """Tüm ürünleri listeler."""
     return await product_service.list_products()
 
 @router.get("/{product_id}")
 async def get_product(product_id: str):
-    """Get details of a specific product."""
+    """Belirli bir ürünün detaylarını getirir."""
     return await product_service.get_product(product_id)
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_product(data: ProductCreate):
-    """Create a new product."""
+    """Yeni bir ürün oluşturur."""
     return await product_service.create_product(data)
 
 @router.put("/{product_id}")
 async def update_product(product_id: str, data: ProductUpdate):
-    """Update product information (name, price, etc.)."""
+    """Ürün bilgilerini günceller."""
     return await product_service.update_product(product_id, data)
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(product_id: str):
-    """Remove a product."""
+    """Bir ürünü siler."""
     await product_service.delete_product(product_id)
