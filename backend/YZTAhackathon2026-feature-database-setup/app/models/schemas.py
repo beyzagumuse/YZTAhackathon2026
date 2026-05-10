@@ -3,8 +3,9 @@ from typing import Optional, List
 
 class UserSignup(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6) 
+    password: str = Field(..., min_length=6)
     full_name: str
+    tc_no: Optional[str] = None
     address: Optional[str] = None
 
 class UserLogin(BaseModel):

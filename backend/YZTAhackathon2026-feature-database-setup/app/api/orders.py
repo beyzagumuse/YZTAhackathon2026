@@ -6,9 +6,9 @@ from app.services import order_service
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.get("/")
-async def list_orders(status: Optional[str] = None, date: Optional[str] = None):
-    """List all orders with optional filters (status, date)."""
-    return await order_service.list_orders(status, date)
+async def list_orders(status: Optional[str] = None, date: Optional[str] = None, customer_id: Optional[str] = None):
+    """List all orders with optional filters (status, date, customer_id)."""
+    return await order_service.list_orders(status, date, customer_id)
 
 @router.get("/{order_id}")
 async def get_order(order_id: str):

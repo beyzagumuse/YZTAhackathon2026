@@ -8,6 +8,7 @@ export default function AuthPages({ onAuthAction, onClose, initialView = 'login'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [tcNo, setTcNo] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
@@ -19,8 +20,9 @@ export default function AuthPages({ onAuthAction, onClose, initialView = 'login'
       onAuthAction('guest', { fullName, email, phone, address });
     } 
     else if (viewMode === 'signup') {
-      if (!email || !password || !fullName) return alert("Lütfen tüm alanları doldurun!");
-      onAuthAction('signup', { email, password, full_name: fullName, address });
+      if (!email || !password || !fullName || !tcNo) return alert("Lütfen tüm alanları doldurun!");
+      if (!/^\d{11}$/.test(tcNo)) return alert("TC Kimlik No 11 haneli rakamlardan oluşmalıdır!");
+      onAuthAction('signup', { email, password, full_name: fullName, tc_no: tcNo });
     } 
     else {
       if (!email || !password) return alert("E-posta ve şifre zorunlu!");
@@ -51,7 +53,10 @@ export default function AuthPages({ onAuthAction, onClose, initialView = 'login'
           {viewMode !== 'guest' && (
             <>
               {viewMode === 'signup' && (
-                <div className="relative mb-4"><User className="absolute left-4 top-4 text-slate-300" size={18} /><input type="text" placeholder="Ad Soyad" value={fullName} onChange={e=>setFullName(e.target.value)} className="w-full bg-slate-50 border p-4 pl-12 rounded-2xl text-sm" /></div>
+                <>
+                  <div className="relative mb-4"><User className="absolute left-4 top-4 text-slate-300" size={18} /><input type="text" placeholder="Ad Soyad" value={fullName} onChange={e=>setFullName(e.target.value)} className="w-full bg-slate-50 border p-4 pl-12 rounded-2xl text-sm" /></div>
+                  <div className="relative mb-4"><Phone className="absolute left-4 top-4 text-slate-300" size={18} /><input type="text" placeholder="TC Kimlik No (11 hane)" maxLength={11} value={tcNo} onChange={e=>setTcNo(e.target.value.replace(/\D/g,''))} className="w-full bg-slate-50 border p-4 pl-12 rounded-2xl text-sm" /></div>
+                </>
               )}
               <div className="relative mb-4"><Mail className="absolute left-4 top-4 text-slate-300" size={18} /><input type="email" placeholder="E-posta" value={email} onChange={e=>setEmail(e.target.value)} className="w-full bg-slate-50 border p-4 pl-12 rounded-2xl text-sm" /></div>
               <div className="relative"><Lock className="absolute left-4 top-4 text-slate-300" size={18} /><input type={showPassword ? "text" : "password"} placeholder="Şifre" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-slate-50 border p-4 pl-12 pr-12 rounded-2xl text-sm" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-4 text-slate-300">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
