@@ -33,6 +33,11 @@ class UserLogin(BaseModel):
     password: str
 
 # --- Profiles ---
+class Profile(BaseModel):
+    id: str
+    tc_no: str
+    full_name: str
+
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
     # email and tc_no are excluded by business logic
@@ -64,6 +69,7 @@ class InventoryUpdate(BaseModel):
 class OrderItem(BaseModel):
     product_id: str
     quantity: int
+    unit_price_at_sale: float
 
 class OrderCreate(BaseModel):
     items: List[OrderItem]
@@ -71,6 +77,19 @@ class OrderCreate(BaseModel):
 
 class OrderUpdate(BaseModel):
     status: str  # e.g., "pending", "shipped", "delivered"
+
+class ShippingCreate(BaseModel):
+    order_id: str
+    carrier_name: str
+    tracking_number: str
+    status: str
+    estimated_delivery: Optional[str] = None
+
+class ShippingUpdate(BaseModel):
+    carrier_name: Optional[str] = None
+    tracking_number: Optional[str] = None
+    status: Optional[str] = None
+    estimated_delivery: Optional[str] = None
 
 # --- Shadow Profiles ---
 class ShadowProfileCreate(BaseModel):

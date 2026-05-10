@@ -3,21 +3,17 @@ from app.models.schemas import UserSignup, UserLogin
 from app.core.supabase_client import supabase_client
 
 async def signup(user_data: UserSignup):
-    # Check if TC No already exists in profiles
-    try:
-        existing_profile = supabase_client.table("profiles").select("id").eq("tc_no", user_data.tc_no).execute()
-        if existing_profile.data:
-            raise HTTPException(status_code=400, detail="Duplicate TC No")
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=str(e))
-
-    # Sign up via Supabase Auth
+    # Sign up via Supabase Auth. The database trigger handles the profile creation.
     try:
         auth_response = supabase_client.auth.sign_up({
             "email": user_data.email,
             "password": user_data.password,
+            "options": {
+                "data": {
+                    "full_name": user_data.full_name,
+                    "tc_no": user_data.tc_no
+                }
+            }
         })
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Signup failed: {str(e)}")
@@ -25,20 +21,7 @@ async def signup(user_data: UserSignup):
     if not auth_response.user:
         raise HTTPException(status_code=400, detail="Signup failed, user not created.")
 
-    user_id = auth_response.user.id
-
-    # Insert extra info into profiles table
-    try:
-        supabase_client.table("profiles").insert({
-            "id": user_id,
-            "tc_no": user_data.tc_no,
-            "full_name": user_data.full_name
-        }).execute()
-    except Exception as e:
-        # Ideally, we should rollback auth signup here, but Supabase doesn't easily allow deleting users from client side
-        raise HTTPException(status_code=500, detail=f"Failed to create user profile: {str(e)}")
-
-    return {"message": "User signed up successfully", "user_id": user_id}
+    return {"message": "User signed up successfully", "user_id": auth_response.user.id}
 
 async def login(user_data: UserLogin):
     try:

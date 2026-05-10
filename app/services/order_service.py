@@ -1,6 +1,7 @@
 from fastapi import HTTPException
-from app.models.schemas import OrderCreate
+from app.models.schemas import OrderCreate, ShippingCreate
 from app.core.supabase_client import supabase_client
+from app.services import shipping_service
 import uuid
 
 async def list_orders(status: str = None, date: str = None):
@@ -46,7 +47,8 @@ async def create_order(order_data: OrderCreate):
             if current_stock < item.quantity:
                 raise HTTPException(status_code=400, detail=f"Out of Stock for product {item.product_id}")
 
-        # Step 2: Deduct stock, log inventory changes
+        # Step 2: Deduct stock, log inventory changes, create order items
+        order_items_data = []
         for item in order_data.items:
             inventory_record = supabase_client.table("inventory").select("quantity").eq("product_id", item.product_id).execute()
             current_stock = inventory_record.data[0]["quantity"]
@@ -62,6 +64,14 @@ async def create_order(order_data: OrderCreate):
                 "reason": f"Order placement: {order_id}"
             }).execute()
 
+            order_items_data.append({
+                "order_id": order_id,
+                "product_id": item.product_id,
+                "quantity": item.quantity,
+                "unit_price_at_sale": item.unit_price_at_sale
+            })
+            total_amount += item.quantity * item.unit_price_at_sale
+
         # Step 3: Create the order record
         supabase_client.table("orders").insert({
             "id": order_id,
@@ -69,6 +79,10 @@ async def create_order(order_data: OrderCreate):
             "total_amount": total_amount,
             "status": "pending"
         }).execute()
+
+        # Step 4: Create order items
+        if order_items_data:
+            supabase_client.table("order_items").insert(order_items_data).execute()
 
         return {"message": "Order created successfully", "order_id": order_id}
     except Exception as e:
@@ -82,6 +96,19 @@ async def update_order_status(order_id: str, status: str):
         res = supabase_client.table("orders").update({"status": status}).eq("id", order_id).execute()
         if not res.data:
             raise HTTPException(status_code=404, detail="Order not found")
+        
+        if status.lower() == "shipped":
+            # Auto-create shipping record
+            try:
+                await shipping_service.create_shipping_record(ShippingCreate(
+                    order_id=order_id,
+                    carrier_name="Default Carrier",
+                    tracking_number="PENDING",
+                    status="processing"
+                ))
+            except Exception:
+                pass  # Ignore failure, or handle it based on business logic
+
         return res.data[0]
     except Exception as e:
         if isinstance(e, HTTPException):

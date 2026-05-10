@@ -2,7 +2,7 @@ from supabase import create_client, Client
 from app.core.config import settings
 
 def get_supabase_client() -> Client:
-    url: str = settings.SUPABASE_URL
+    url: str = settings.SUPABASE_URL.replace("/rest/v1", "").strip("/")
     key: str = settings.SUPABASE_KEY
     supabase: Client = create_client(url, key)
     return supabase
