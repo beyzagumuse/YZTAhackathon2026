@@ -61,13 +61,12 @@ async def create_order(order_data: OrderCreate):
             "id": order_id,
             "customer_id": order_data.customer_id,
             "total_amount": total_amount,
+            "address": order_data.address, 
             "status": "pending"
         }).execute()
 
         return {"message": "Order created successfully", "order_id": order_id}
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
         raise HTTPException(status_code=500, detail=str(e))
 
 async def update_order_status(order_id: str, status: str):

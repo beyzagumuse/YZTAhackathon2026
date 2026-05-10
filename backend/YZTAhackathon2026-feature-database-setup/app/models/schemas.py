@@ -3,9 +3,9 @@ from typing import Optional, List
 
 class UserSignup(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6) # Katı kurallar kaldırıldı, sadece en az 6 karakter
+    password: str = Field(..., min_length=6) 
     full_name: str
-    address: Optional[str] = None # TC no silindi, adres eklendi
+    address: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
