@@ -13,6 +13,7 @@ import CustomerView from './components/dashboard/CustomerView';
 import AddProductView from './components/dashboard/AddProductView';
 import AdminOrdersView from './components/dashboard/AdminOrdersView';
 import AdminStockView from './components/dashboard/AdminStockView';
+import ChatWidget from './components/marketplace/ChatWidget';
 
 type Role = 'admin' | 'kayıtlıuser';
 type ViewMode = 'home' | 'panel' | 'cart';
@@ -208,6 +209,7 @@ export default function SmartOpsDashboard() {
         {showAuth && (
            <AuthPages initialView={authView} allowGuest={currentView === 'cart'} onClose={() => setShowAuth(false)} onAuthAction={handleAuthAction} />
         )}
+        <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} />
       </div>
     );
   }

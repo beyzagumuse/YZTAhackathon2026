@@ -5,10 +5,10 @@ import httpx
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "gemma4:31b"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 def _build_system_prompt() -> str:
-    """Veritabanı anlık özetini alıp sistem promptuna gömer."""
     try:
         orders = supabase_client.table("orders").select("status").execute().data or []
         counts = {"pending": 0, "shipped": 0, "delivered": 0}
@@ -17,21 +17,45 @@ def _build_system_prompt() -> str:
             if s in counts:
                 counts[s] += 1
 
-        inv = supabase_client.table("inventory").select("quantity").execute().data or []
-        critical = sum(1 for i in inv if (i.get("quantity") or 0) <= 5)
-        low = sum(1 for i in inv if 5 < (i.get("quantity") or 0) <= 20)
+        inv = supabase_client.table("inventory").select("quantity, products(name)").execute().data or []
+        critical = [(i["products"]["name"], i["quantity"]) for i in inv if (i.get("quantity") or 0) <= 5 and i.get("products")]
+        low_count = sum(1 for i in inv if 5 < (i.get("quantity") or 0) <= 20)
+
+        # En çok satan ürünler (order_items toplamı)
+        items = supabase_client.table("order_items").select("quantity, products(name)").execute().data or []
+        sales: dict = {}
+        for it in items:
+            name = (it.get("products") or {}).get("name")
+            if name:
+                sales[name] = sales.get(name, 0) + it["quantity"]
+        top5 = sorted(sales.items(), key=lambda x: x[1], reverse=True)[:5]
+        top5_str = "\n".join(f"  {i+1}. {name}: {qty} adet" for i, (name, qty) in enumerate(top5)) or "  Veri yok"
+
+        # Kritik stok listesi
+        critical_str = "\n".join(f"  - {name}: {qty} adet" for name, qty in critical[:5]) or "  Yok"
+
     except Exception:
         counts = {"pending": "?", "shipped": "?", "delivered": "?"}
-        critical = low = "?"
+        top5_str = "  Veri alinamadi"
+        critical_str = "  Veri alinamadi"
+        low_count = "?"
 
     return f"""Sen SmartOps ERP sisteminin AI asistanısın. Türkçe yanıt ver.
 
+KURAL: Sadece aşağıdaki gerçek verileri kullan. Bu verilerin dışında tahmin veya uydurma yapma.
+Eğer bir soruyu yanıtlamak için yeterli verin yoksa bunu açıkça söyle.
+Yanıtlarında markdown formatı kullanma, yıldız (*) veya diyez (#) karakteri yazma, düz metin yaz.
+
 Güncel sistem durumu:
 - Siparişler: {counts['pending']} hazırlanıyor, {counts['shipped']} kargoda, {counts['delivered']} teslim edildi
-- Stok: {critical} kritik ürün (≤5 adet), {low} düşük stok ürün (6-20 adet)
+- Kritik stok (<=5 adet):
+{critical_str}
+- Düşük stok ürün sayısı (6-20 adet): {low_count}
 
-Veritabanı tablolar: orders, order_items, products, inventory, inventory_logs, profiles, shipping
-Admin sorularına kısa ve analitik cevap ver. Sayısal veri varsa onu öne çıkar."""
+En çok satan 5 ürün (toplam sipariş adedi):
+{top5_str}
+
+Bu veriler dışında (örn. gelir, müşteri adları, tarih aralıkları) soru gelirse "Bu bilgiye şu an erişimim yok" de."""
 
 
 async def chat_gemini(message: str) -> str:
@@ -39,59 +63,32 @@ async def chat_gemini(message: str) -> str:
     api_key = settings.GEMINI_API_KEY
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY tanımlı değil.")
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
-        system_instruction=_build_system_prompt(),
-    )
-    response = model.generate_content(message)
-    return response.text
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name=GEMINI_MODEL,
+            system_instruction=_build_system_prompt(),
+        )
+        response = model.generate_content(message)
+        return response.text
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gemini hatası: {str(e)}")
 
 
 async def chat_ollama(message: str) -> str:
     system = _build_system_prompt()
     prompt = f"{system}\n\nKullanıcı: {message}\nAsistan:"
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        res = await client.post(OLLAMA_URL, json={
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
-        })
-        if res.status_code != 200:
-            raise HTTPException(status_code=502, detail=f"Ollama hatası: {res.text}")
-        return res.json().get("response", "")
-
-
-async def chat_customer(message: str, customer_id: str = None) -> str:
-    """Müşteri chatbotu — sadece sipariş sorgularını yanıtlar."""
-    import google.generativeai as genai
-    api_key = settings.GEMINI_API_KEY
-    if not api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY tanımlı değil.")
-
-    order_context = ""
-    if customer_id:
-        try:
-            orders = supabase_client.table("orders") \
-                .select("id, status, total_amount, created_at, order_items(quantity, unit_price_at_sale, products(name))") \
-                .eq("customer_id", customer_id) \
-                .order("created_at", desc=True).limit(5).execute().data or []
-            if orders:
-                lines = []
-                for o in orders:
-                    items_str = ", ".join(
-                        f"{it['products']['name']} x{it['quantity']}" for it in (o.get("order_items") or []) if it.get("products")
-                    )
-                    lines.append(f"- Sipariş #{o['id'][:8].upper()}: {o['status']} | {o['total_amount']} ₺ | {items_str}")
-                order_context = "Müşterinin son siparişleri:\n" + "\n".join(lines)
-        except Exception:
-            pass
-
-    system = f"""Sen SmartOps mağazasının müşteri hizmetleri asistanısın. Türkçe, kısa ve samimi cevap ver.
-Sadece sipariş durumu, ürünler ve teslimat konularında yardım et.
-{order_context}"""
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash", system_instruction=system)
-    response = model.generate_content(message)
-    return response.text
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            res = await client.post(OLLAMA_URL, json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+            })
+            if res.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Ollama hatası: {res.text}")
+            return res.json().get("response", "")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Ollama bağlantı hatası: {str(e)}")

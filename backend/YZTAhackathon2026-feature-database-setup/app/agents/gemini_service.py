@@ -1,15 +1,12 @@
 import google.generativeai as genai
 from app.core.config import settings
-
-
 from app.agents.tools import check_stock_and_price, get_order_status
+from typing import Dict, List
 
-# Gemini API anahtarını tanımla
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
-# Ajanın kişiliği ve kuralları (System Prompt)
 SYSTEM_PROMPT = """
-Sen SmartOps şirketinin zeki ve yardımsever ERP ve E-Ticaret asistanısın. 
+Sen SmartOps şirketinin zeki ve yardımsever ERP ve E-Ticaret asistanısın.
 Müşterilere kibar, samimi ve profesyonel bir dille yardımcı ol.
 
 KURALLAR:
@@ -20,17 +17,32 @@ KURALLAR:
 5. Cevaplarını kısa, anlaşılır ve Türkçe ver.
 """
 
-
 model = genai.GenerativeModel(
     model_name="gemini-2.5-flash",
     system_instruction=SYSTEM_PROMPT,
-    tools=[check_stock_and_price, get_order_status] 
+    tools=[check_stock_and_price, get_order_status]
 )
 
-async def chat_with_agent(user_message: str) -> str:
+# session_id -> Gemini Content listesi (son 10 tur = 20 item)
+_sessions: Dict[str, List] = {}
+WINDOW_SIZE = 10
+
+
+async def chat_with_agent(user_message: str, session_id: str = None) -> str:
     try:
-        chat = model.start_chat(enable_automatic_function_calling=True)
+        history = _sessions.get(session_id, []) if session_id else []
+
+        chat = model.start_chat(
+            history=history,
+            enable_automatic_function_calling=True
+        )
         response = chat.send_message(user_message)
+
+        # Sliding window: chat.history tüm turları içerir (tool call dahil)
+        # Son WINDOW_SIZE * 2 item'ı tut (~10 kullanıcı turu)
+        if session_id:
+            _sessions[session_id] = list(chat.history)[-(WINDOW_SIZE * 2):]
+
         return response.text
     except Exception as e:
         return f"Yapay zeka asistanında geçici bir sorun var: {str(e)}"
