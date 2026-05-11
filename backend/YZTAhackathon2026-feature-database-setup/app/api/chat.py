@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.agents import gemini_service
+from app.agents.gemini_service import chat_with_agent
 
 router = APIRouter(prefix="/chat", tags=["AI Chatbot"])
 
@@ -8,7 +8,7 @@ class ChatRequest(BaseModel):
     message: str
 
 @router.post("/")
-async def chat_with_ai(req: ChatRequest):
-    """Müşteri veya yöneticinin doğal dilde soru sorduğu endpoint."""
-    reply = await gemini_service.ask_ai(req.message)
+async def chat_endpoint(request: ChatRequest):
+    """Kullanıcı mesajını alır, yapay zekaya iletir ve cevabı döner."""
+    reply = await chat_with_agent(request.message)
     return {"reply": reply}

@@ -11,6 +11,7 @@ class Settings:
     PROJECT_NAME: str = "SmartOps AI"
     SUPABASE_URL: str = os.getenv("SUPABASE_URL")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")
     
     # Dil Seçenekleri
     DEFAULT_LANGUAGE: str = "tr" # tr veya eng

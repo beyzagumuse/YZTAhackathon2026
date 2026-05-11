@@ -1,44 +1,32 @@
-import os
-from dotenv import load_dotenv
 import google.generativeai as genai
-from fastapi import HTTPException
-from app.agents.tools import get_stock_level, get_order_status
+from app.core.config import settings
+from app.agents.tools import check_stock_and_price
 
-# .env dosyasındaki değişkenleri sisteme yükler (500 hatasını çözen kısım)
-load_dotenv()
+# Gemini API anahtarını tanımla
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
-# API Key .env dosyasından okunur
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-else:
-    print("⚠️ DİKKAT: GEMINI_API_KEY .env dosyasından okunamadı! Lütfen .env dosyasını kontrol edin.")
-
-# Gemini'a kim olduğunu ve araçları nasıl kullanacağını anlattığımız sistem komutu
-system_prompt = """
-Sen SmartOps KOBİ asistanısın. Müşterilerin stok ve kargo sorularını yanıtlarsın.
-Her zaman sana verilen araçları (tools) kullanarak veritabanından gerçek verileri çek.
-Cevapların kısa, net ve profesyonel olsun. Türkçe yanıt ver.
+# Ajanın kişiliği (System Prompt)
+SYSTEM_PROMPT = """
+Sen SmartOps şirketinin zeki ve yardımsever ERP ve E-Ticaret asistanısın. 
+Müşterilere kibar, samimi ve profesyonel bir dille yardımcı ol.
+Ürün fiyatı veya stok durumu sorulduğunda DAİMA sana verilen 'check_stock_and_price' aracını (tool) kullan.
+Kendi kendine tahminde bulunma, sadece aracın sana döndürdüğü gerçek verileri kullanarak cevap ver.
+Cevaplarını kısa, anlaşılır ve Türkçe ver.
 """
 
-# Modeli başlat
+# Modeli Başlat (Aracı modele tanıtıyoruz)
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash-latest',
-    tools=[get_stock_level, get_order_status],
-    system_instruction=system_prompt
+    model_name="gemini-2.5-flash",
+    system_instruction=SYSTEM_PROMPT,
+    tools=[check_stock_and_price] # Yapay zekaya alet çantasını verdik!
 )
 
-# Otomatik fonksiyon çağırma (Function Calling) özellikli sohbet oturumu
-chat_session = model.start_chat(enable_automatic_function_calling=True)
-
-async def ask_ai(user_message: str) -> str:
-    """Kullanıcı mesajını Gemini'a gönderir ve yanıtı döner."""
-    if not GEMINI_API_KEY:
-         raise HTTPException(status_code=500, detail="GEMINI_API_KEY is missing. Check .env file.")
+async def chat_with_agent(user_message: str) -> str:
     try:
-        response = chat_session.send_message(user_message)
+        # enable_automatic_function_calling=True sayesinde model gerektiğinde 
+        # kodumuzdaki fonksiyonu kendi kendine çalıştırıp cevabını alır.
+        chat = model.start_chat(enable_automatic_function_calling=True)
+        response = chat.send_message(user_message)
         return response.text
     except Exception as e:
-        print(f"AI İşlem Hatası: {str(e)}") # Konsola hatanın detayını yazar
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+        return f"Yapay zeka asistanında geçici bir sorun var: {str(e)}"
