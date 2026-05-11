@@ -11,6 +11,8 @@ import Header from './components/layout/Header';
 import AdminView from './components/dashboard/AdminView';
 import CustomerView from './components/dashboard/CustomerView';
 import AddProductView from './components/dashboard/AddProductView';
+import AdminOrdersView from './components/dashboard/AdminOrdersView';
+import AdminStockView from './components/dashboard/AdminStockView';
 
 type Role = 'admin' | 'kayıtlıuser';
 type ViewMode = 'home' | 'panel' | 'cart';
@@ -218,9 +220,11 @@ export default function SmartOpsDashboard() {
         <button onClick={() => setCurrentView('home')} className="mb-6 flex items-center gap-2 text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-all">← Mağazaya Geri Dön</button>
         <Header role={role} />
         <div className="mt-8">
-          {activeTab === 'panel' ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
-          : activeTab === 'add-product' ? ( <AddProductView /> )
-          : activeTab === 'orders' ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
+          {activeTab === 'panel'        ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
+          : activeTab === 'admin-orders' ? ( <AdminOrdersView /> )
+          : activeTab === 'admin-stock'  ? ( <AdminStockView /> )
+          : activeTab === 'add-product'  ? ( <AddProductView /> )
+          : activeTab === 'orders'       ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
           : (
              <div className="p-20 text-center border-2 border-dashed border-slate-100 rounded-[48px]"><h2 className="text-2xl font-black text-slate-300 uppercase">{activeTab.toUpperCase()} Modülü</h2></div>
           )}
