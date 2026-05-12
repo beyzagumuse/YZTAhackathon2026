@@ -35,6 +35,3 @@ class _LazyClient:
 
 # Export as supabase_client - will be initialized on first use
 supabase_client = _LazyClient()
-
-
-supabase_client = None  # Will be initialized on first use
