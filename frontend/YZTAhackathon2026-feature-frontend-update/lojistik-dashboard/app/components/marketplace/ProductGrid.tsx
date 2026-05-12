@@ -32,7 +32,7 @@ export default function ProductGrid({ onAddToCart, searchQuery = '', selectedCat
         const formatted = data.map((p: any) => ({
           id: p.id,
           name: p.name,
-          category: p.description ?? 'Genel',
+          category: p.category ?? p.description ?? 'Genel',
           price: p.price,
           stock: 10,
           image: 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?w=500&q=80',
