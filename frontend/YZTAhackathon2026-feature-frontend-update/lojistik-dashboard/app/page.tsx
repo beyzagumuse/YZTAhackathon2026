@@ -14,6 +14,7 @@ import AddProductView from './components/dashboard/AddProductView';
 import AdminOrdersView from './components/dashboard/AdminOrdersView';
 import AdminStockView from './components/dashboard/AdminStockView';
 import AdminProductsView from './components/dashboard/AdminProductsView';
+import AdminAnalyticsView from './components/dashboard/AdminAnalyticsView';
 import ChatWidget from './components/marketplace/ChatWidget';
 
 type Role = 'admin' | 'kayıtlıuser';
@@ -246,6 +247,7 @@ export default function SmartOpsDashboard() {
           : activeTab === 'admin-stock'    ? ( <AdminStockView /> )
           : activeTab === 'admin-products' ? ( <AdminProductsView /> )
           : activeTab === 'add-product'    ? ( <AddProductView /> )
+          : activeTab === 'analytics'      ? ( <AdminAnalyticsView /> )
           : activeTab === 'orders'         ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
           : (
              <div className="p-20 text-center border-2 border-dashed border-slate-100 rounded-[48px]"><h2 className="text-2xl font-black text-slate-300 uppercase">{activeTab.toUpperCase()} Modülü</h2></div>
