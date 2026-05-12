@@ -139,16 +139,27 @@ async def get_stats():
         top_products = sorted(prod_sales.items(), key=lambda x: x[1], reverse=True)[:8]
         category_sales = sorted(cat_sales.items(), key=lambda x: x[1], reverse=True)[:8]
 
-        inv = supabase_client.table("inventory").select("quantity").execute().data or []
+        inv = supabase_client.table("inventory").select("quantity, safety_stock, products(name)").execute().data or []
         stock = {"critical": 0, "low": 0, "normal": 0}
+        anomaly_products = []
         for i in inv:
             q = i.get("quantity", 0)
+            s = i.get("safety_stock") or 0
+            if s > 0 and q < s:
+                anomaly_products.append({
+                    "name": (i.get("products") or {}).get("name", "?"),
+                    "quantity": q,
+                    "safety_stock": s,
+                    "diff": s - q,
+                })
             if q <= 5:
                 stock["critical"] += 1
             elif q <= 20:
                 stock["low"] += 1
             else:
                 stock["normal"] += 1
+
+        anomaly_products.sort(key=lambda x: x["diff"], reverse=True)
 
         return {
             "total_orders": len(orders),
@@ -159,6 +170,7 @@ async def get_stats():
             "top_products": [{"name": n, "quantity": q} for n, q in top_products],
             "category_sales": [{"category": c, "quantity": q} for c, q in category_sales],
             "stock_summary": stock,
+            "anomaly_products": anomaly_products,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

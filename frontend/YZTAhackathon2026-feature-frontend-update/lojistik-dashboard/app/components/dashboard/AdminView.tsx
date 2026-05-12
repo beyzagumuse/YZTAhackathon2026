@@ -33,9 +33,13 @@ export default function AdminView() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8000/orders/stats').then(r => r.json()).then(setStats).catch(() => {});
-    fetch('http://localhost:8000/inventory/anomalies').then(r => r.json())
-      .then(d => setAnomalyCount(Array.isArray(d) ? d.length : 0)).catch(() => {});
+    fetch('http://localhost:8000/orders/stats')
+      .then(r => r.json())
+      .then(data => {
+        setStats(data);
+        setAnomalyCount(Array.isArray(data?.anomaly_products) ? data.anomaly_products.length : 0);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
@@ -89,6 +93,35 @@ export default function AdminView() {
           </div>
         ))}
       </div>
+
+      {/* ── Anomaly Warning Panel ── */}
+      {stats?.anomaly_products?.length > 0 && (
+        <div className="bg-rose-50 border border-rose-100 rounded-[32px] p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertCircle size={16} className="text-rose-500 flex-shrink-0" />
+            <span className="text-xs font-black uppercase tracking-widest text-rose-600">
+              Emniyet Stoğu Altında — {stats.anomaly_products.length} Ürün
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {stats.anomaly_products.map((item: any, i: number) => (
+              <div key={i} className="bg-white rounded-2xl px-4 py-3 border border-rose-100 space-y-1">
+                <p className="text-xs font-black text-slate-800 truncate">{item.name}</p>
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase">
+                  <span className="text-rose-500">Stok: {item.quantity}</span>
+                  <span className="text-slate-400">Min: {item.safety_stock}</span>
+                </div>
+                <div className="w-full bg-rose-100 rounded-full h-1.5">
+                  <div
+                    className="bg-rose-500 h-1.5 rounded-full"
+                    style={{ width: `${Math.min(100, (item.quantity / item.safety_stock) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Top Products (horizontal bar) + AI Chat ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
