@@ -20,9 +20,22 @@ const STATUS_CFG = [
   { key: 'delivered', label: 'Teslim Edildi',color: '#10b981' },
 ];
 
+const SEVERITY_CFG: Record<string, { bg: string; text: string; border: string; badge: string }> = {
+  high:   { bg: 'bg-rose-50',   text: 'text-rose-700',   border: 'border-rose-200',   badge: 'bg-rose-100 text-rose-600' },
+  medium: { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-600' },
+  low:    { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-600' },
+};
+
+const TYPE_ICON: Record<string, string> = {
+  safety_stock:    '⚠',
+  critical_stock:  '🔴',
+  pending_overload:'⏳',
+  slow_moving:     '📦',
+};
+
 export default function AdminView() {
   const [stats, setStats] = useState<any>(null);
-  const [anomalyCount, setAnomalyCount] = useState<number | null>(null);
+  const [anomalyReport, setAnomalyReport] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'bot', text: 'Merhaba, ADMIN yetkisiyle bağlandınız. Sistem analizleri ve raporlamalar için hazırım.' },
   ]);
@@ -35,10 +48,11 @@ export default function AdminView() {
   useEffect(() => {
     fetch('http://localhost:8000/orders/stats')
       .then(r => r.json())
-      .then(data => {
-        setStats(data);
-        setAnomalyCount(Array.isArray(data?.anomaly_products) ? data.anomaly_products.length : 0);
-      })
+      .then(data => setStats(data))
+      .catch(() => {});
+    fetch('http://localhost:8000/inventory/anomaly-report')
+      .then(r => r.json())
+      .then(data => setAnomalyReport(data))
       .catch(() => {});
   }, []);
 
@@ -74,7 +88,7 @@ export default function AdminView() {
     { label: 'Toplam Sipariş', val: stats?.total_orders ?? '—', sub: 'sipariş', color: 'text-blue-600', bg: 'bg-blue-50', icon: <Package size={18}/> },
     { label: 'Toplam Ciro', val: stats ? `${Number(stats.total_revenue).toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺` : '—', sub: 'gelir', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: <TrendingUp size={18}/> },
     { label: 'Kargoda', val: stats?.shipped ?? '—', sub: 'sipariş', color: 'text-amber-600', bg: 'bg-amber-50', icon: <Truck size={18}/> },
-    { label: 'Kritik Anomali', val: anomalyCount ?? '—', sub: 'ürün', color: 'text-rose-600', bg: 'bg-rose-50', icon: <AlertCircle size={18}/> },
+    { label: 'Kritik Anomali', val: anomalyReport?.total ?? '—', sub: 'uyarı', color: 'text-rose-600', bg: 'bg-rose-50', icon: <AlertCircle size={18}/> },
   ];
 
   return (
@@ -95,30 +109,56 @@ export default function AdminView() {
       </div>
 
       {/* ── Anomaly Warning Panel ── */}
-      {stats?.anomaly_products?.length > 0 && (
-        <div className="bg-rose-50 border border-rose-100 rounded-[32px] p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertCircle size={16} className="text-rose-500 flex-shrink-0" />
-            <span className="text-xs font-black uppercase tracking-widest text-rose-600">
-              Emniyet Stoğu Altında — {stats.anomaly_products.length} Ürün
-            </span>
+      {anomalyReport?.anomalies?.length > 0 && (
+        <div className="bg-slate-50 border border-slate-100 rounded-[32px] p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="text-rose-500 flex-shrink-0" />
+              <span className="text-xs font-black uppercase tracking-widest text-slate-700">
+                Anomali Raporu — {anomalyReport.total} Uyarı
+              </span>
+            </div>
+            <div className="flex gap-2 text-[10px] font-black uppercase">
+              {anomalyReport.by_type?.safety_stock > 0 && (
+                <span className="bg-rose-100 text-rose-600 px-2 py-1 rounded-lg">
+                  Emniyet Stoğu: {anomalyReport.by_type.safety_stock}
+                </span>
+              )}
+              {anomalyReport.by_type?.critical_stock > 0 && (
+                <span className="bg-rose-100 text-rose-600 px-2 py-1 rounded-lg">
+                  Kritik: {anomalyReport.by_type.critical_stock}
+                </span>
+              )}
+              {anomalyReport.by_type?.pending_overload > 0 && (
+                <span className="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg">
+                  Sipariş Yığılması: {anomalyReport.by_type.pending_overload}
+                </span>
+              )}
+              {anomalyReport.by_type?.slow_moving > 0 && (
+                <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded-lg">
+                  Hareketsiz: {anomalyReport.by_type.slow_moving}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {stats.anomaly_products.map((item: any, i: number) => (
-              <div key={i} className="bg-white rounded-2xl px-4 py-3 border border-rose-100 space-y-1">
-                <p className="text-xs font-black text-slate-800 truncate">{item.name}</p>
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase">
-                  <span className="text-rose-500">Stok: {item.quantity}</span>
-                  <span className="text-slate-400">Min: {item.safety_stock}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {anomalyReport.anomalies.map((item: any, i: number) => {
+              const cfg = SEVERITY_CFG[item.severity] ?? SEVERITY_CFG.low;
+              const icon = TYPE_ICON[item.type] ?? '⚠';
+              return (
+                <div key={i} className={`bg-white rounded-2xl px-4 py-3 border ${cfg.border} space-y-1.5`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${cfg.badge}`}>
+                      {icon} {item.label}
+                    </span>
+                  </div>
+                  {item.product && (
+                    <p className="text-xs font-black text-slate-800 truncate">{item.product}</p>
+                  )}
+                  <p className={`text-[10px] font-bold ${cfg.text}`}>{item.detail}</p>
                 </div>
-                <div className="w-full bg-rose-100 rounded-full h-1.5">
-                  <div
-                    className="bg-rose-500 h-1.5 rounded-full"
-                    style={{ width: `${Math.min(100, (item.quantity / item.safety_stock) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -156,7 +196,7 @@ export default function AdminView() {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_12px_#3b82f6]" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">
-                {model === 'gemini' ? 'Gemini 1.5 Flash' : 'Gemma4:31B (Local)'}
+                {model === 'gemini' ? 'Gemini 2.5 Flash' : 'Gemma4:31B (Local)'}
               </span>
             </div>
             {isLoading && <Loader2 size={14} className="text-blue-500 animate-spin" />}

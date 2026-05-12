@@ -201,3 +201,125 @@ def list_all_customers() -> str:
         return output
     except Exception as e:
         return f"Müşteri listesi alınamadı (hata: {type(e).__name__}: {e})"
+
+
+def get_slow_moving_products() -> str:
+    """
+    Son 30 günde satılmayan veya çok az satılan ürünleri tespit eder ve kampanya önerisi sunar.
+    Hareketsiz stok, satılmayan ürün, stok devir hızı, kampanya önerisi, promosyon önerisinde kullan.
+    """
+    from datetime import datetime, timezone, timedelta
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+
+        items = (
+            supabase_client.table("order_items")
+            .select("product_id, quantity, orders(created_at)")
+            .execute().data or []
+        )
+        recent_sales: dict = {}
+        for item in items:
+            if (item.get("orders") or {}).get("created_at", "") >= cutoff:
+                pid = item.get("product_id")
+                recent_sales[pid] = recent_sales.get(pid, 0) + (item.get("quantity") or 0)
+
+        inv = (
+            supabase_client.table("inventory")
+            .select("product_id, quantity, products(name, price)")
+            .execute().data or []
+        )
+
+        slow_movers = []
+        for row in inv:
+            pid = row.get("product_id")
+            qty = row.get("quantity", 0)
+            product = row.get("products") or {}
+            name = product.get("name", "?")
+            price = float(product.get("price") or 0)
+            sold_30d = recent_sales.get(pid, 0)
+            if qty > 5 and sold_30d < 3:
+                slow_movers.append({
+                    "name": name, "stock": qty,
+                    "sold_30d": sold_30d,
+                    "stock_value": qty * price,
+                })
+
+        if not slow_movers:
+            return "Son 30 günde hareketsiz ürün yok, tüm stoklar aktif satışta."
+
+        slow_movers.sort(key=lambda x: x["stock_value"], reverse=True)
+        total_value = sum(p["stock_value"] for p in slow_movers)
+
+        lines = [
+            f"- {p['name']}: {p['stock']} adet stok, 30 günde {p['sold_30d']} satış, stok değeri {p['stock_value']:,.0f} TL"
+            for p in slow_movers[:8]
+        ]
+        result = f"Hareketsiz stok tespiti ({len(slow_movers)} ürün, toplam stok değeri {total_value:,.0f} TL):\n"
+        result += "\n".join(lines)
+        result += (
+            "\n\nKampanya Önerisi: "
+            "Bu ürünler için %15-20 indirim kampanyası, bundle teklifi (birlikte al tasarruf et) "
+            "veya öne çıkarma aksiyonu ile stok devir hızı artırılabilir. "
+            "En yüksek stok değerine sahip ürünlere öncelik verin."
+        )
+        return result
+    except Exception as e:
+        return f"Hareketsiz stok analizi yapılamadı (hata: {type(e).__name__}: {e})"
+
+
+def get_full_anomaly_report() -> str:
+    """
+    Tüm anomali türlerini tek raporda sunar: emniyet stoğu ihlali, kritik stok (<=2),
+    bekleyen sipariş yığılması (>%40), hareketsiz stok (30 günde satış yok).
+    Genel anomali raporu, sistem durumu, ne sorun var, risk analizi sorularında kullan.
+    """
+    from datetime import datetime, timezone, timedelta
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff_30d = (now - timedelta(days=30)).isoformat()
+        parts = []
+
+        inv = supabase_client.table("inventory").select("product_id, quantity, safety_stock, products(name)").execute().data or []
+
+        # Safety stock breaches
+        safety_breach = [
+            i for i in inv
+            if (i.get("safety_stock") or 0) > 0
+            and (i.get("quantity") or 0) < (i.get("safety_stock") or 0)
+        ]
+        if safety_breach:
+            lines = [
+                f"  - {(i.get('products') or {}).get('name','?')}: {i['quantity']}/{i['safety_stock']} (eksik: {i['safety_stock']-i['quantity']})"
+                for i in sorted(safety_breach, key=lambda x: (x.get("safety_stock") or 0) - (x.get("quantity") or 0), reverse=True)[:5]
+            ]
+            parts.append(f"Emniyet stoğu ihlali ({len(safety_breach)} ürün):\n" + "\n".join(lines))
+
+        # Critical stock
+        safety_pids = {i.get("product_id") for i in safety_breach}
+        critical = [i for i in inv if (i.get("quantity") or 0) <= 2 and i.get("product_id") not in safety_pids]
+        if critical:
+            names = ", ".join((i.get("products") or {}).get("name", "?") for i in critical[:5])
+            parts.append(f"Kritik stok (<=2 adet): {names}")
+
+        # Pending overload
+        orders = supabase_client.table("orders").select("status").execute().data or []
+        if orders:
+            pending = sum(1 for o in orders if o.get("status") == "pending")
+            ratio = pending / len(orders)
+            if ratio > 0.40:
+                parts.append(f"Bekleyen sipariş yığılması: {pending}/{len(orders)} sipariş bekliyor (%{ratio*100:.0f})")
+
+        # Slow movers
+        recent = supabase_client.table("order_items").select("product_id, orders(created_at)").execute().data or []
+        sold_ids = {i["product_id"] for i in recent if (i.get("orders") or {}).get("created_at", "") >= cutoff_30d}
+        slow = [i for i in inv if (i.get("quantity") or 0) > 10 and i.get("product_id") not in sold_ids]
+        if slow:
+            names = ", ".join((i.get("products") or {}).get("name", "?") for i in slow[:5])
+            parts.append(f"Hareketsiz stok (30 günde sıfır satış, >10 adet): {names}{'...' if len(slow) > 5 else ''}")
+
+        if not parts:
+            return "Sistem sağlıklı, kritik anomali tespit edilmedi."
+
+        return "Anomali Raporu:\n\n" + "\n\n".join(parts)
+    except Exception as e:
+        return f"Anomali raporu alınamadı (hata: {type(e).__name__}: {e})"

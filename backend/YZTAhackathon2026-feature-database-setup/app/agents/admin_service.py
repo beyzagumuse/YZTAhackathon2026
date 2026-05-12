@@ -10,6 +10,8 @@ from app.agents.admin_tools import (
     list_all_orders_for_admin,
     get_inventory_report,
     list_all_customers,
+    get_slow_moving_products,
+    get_full_anomaly_report,
 )
 from typing import Dict, List
 import httpx
@@ -28,15 +30,18 @@ KURALLAR:
 6. Tüm siparişleri veya müşteri bilgisini içeren sorularda 'list_all_orders_for_admin' veya 'list_all_customers' aracını kullan.
 7. Aracın döndürdüğü veri dışında tahminde bulunma.
 8. Yıldız (*) veya diyez (#) gibi markdown karakteri kullanma, düz metin yaz.
+9. Hareketsiz stok, satılmayan ürün, kampanya önerisi sorularında DAİMA 'get_slow_moving_products' aracını kullan.
+10. Genel anomali raporu, sistem durumu, risk analizi, ne sorun var sorularında DAİMA 'get_full_anomaly_report' aracını kullan.
 """
 
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
+    model_name="gemini-2.5-flash",
     system_instruction=SYSTEM_PROMPT,
     tools=[
         get_sales_ranking, get_stock_status, get_order_statistics,
         get_product_detail, get_anomalies,
         list_all_orders_for_admin, get_inventory_report, list_all_customers,
+        get_slow_moving_products, get_full_anomaly_report,
     ],
 )
 
