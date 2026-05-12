@@ -1,6 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { ShoppingCart, AlertCircle } from 'lucide-react';
 
+const PRODUCT_IMAGES: Record<string, string> = {
+  'TOZ SEKER':      '/gorseller/toz-seker.jpg',
+  'KIRMIZI BIBER':  '/gorseller/kirmizi-biber.webp',
+  'CERI DOMATES':   '/gorseller/ceri-domates.jpg',
+  'SALKIM DOMATES': '/gorseller/salkim-domates.webp',
+  'PATATES':        '/gorseller/patates.webp',
+  'KABAK':          '/gorseller/kabak.jpg',
+  'DOMATES':        '/gorseller/domates.jpg',
+  'SALATALIK':      '/gorseller/salatalik.webp',
+};
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?w=500&q=80';
+
 interface ProductGridProps {
   onAddToCart: (product: any) => void;
   searchQuery?: string;
@@ -29,14 +42,16 @@ export default function ProductGrid({ onAddToCart, searchQuery = '', selectedCat
       })
       .then(data => {
         if (!Array.isArray(data)) throw new Error('Sunucudan ürün listesi yerine farklı bir veri formatı geldi.');
-        const formatted = data.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          category: p.category ?? p.description ?? 'Genel',
-          price: p.price,
-          stock: 10,
-          image: 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?w=500&q=80',
-        }));
+        const formatted = data
+          .filter((p: any) => p.category !== 'SİGARA' && p.category !== 'SIGARA')
+          .map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category ?? p.description ?? 'Genel',
+            price: p.price,
+            stock: 10,
+            image: PRODUCT_IMAGES[p.name] ?? FALLBACK_IMAGE,
+          }));
         setProducts(formatted);
         setLoading(false);
       })
