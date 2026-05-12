@@ -24,6 +24,11 @@ async def patch_stock(product_id: str, data: InventoryUpdate):
     """Update absolute stock quantity for manual end-of-day counts."""
     return await inventory_service.set_inventory_stock(product_id, data)
 
+@router.get("/anomalies")
+async def get_anomalies():
+    """Stok miktarı emniyet stoğunun altında olan ürünleri döndürür."""
+    return await inventory_service.get_anomalies()
+
 @router.post("/day-end")
 async def trigger_day_end_analysis():
     """Trigger the daily inventory analysis and generate a procurement report."""

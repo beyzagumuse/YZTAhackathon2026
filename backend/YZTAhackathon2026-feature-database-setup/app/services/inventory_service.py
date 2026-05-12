@@ -38,6 +38,20 @@ async def get_all_inventory():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+async def get_anomalies():
+    """Return inventory items where quantity < safety_stock (reorder point breached)."""
+    try:
+        res = supabase_client.table("inventory").select("*, products(name, price)").execute()
+        anomalies = [
+            item for item in (res.data or [])
+            if (item.get("safety_stock") or 0) > 0
+            and (item.get("quantity") or 0) < (item.get("safety_stock") or 0)
+        ]
+        return anomalies
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 async def get_inventory_by_product(product_id: str):
     """Get specific stock info for a single product."""
     try:
@@ -63,7 +77,10 @@ async def set_inventory_stock(product_id: str, data: InventoryUpdate):
         if data.stock_quantity < 0:
             raise HTTPException(status_code=400, detail="Stock cannot be negative")
 
-        supabase_client.table("inventory").update({"quantity": data.stock_quantity}).eq("product_id", product_id).execute()
+        inv_update: dict = {"quantity": data.stock_quantity}
+        if data.safety_stock is not None:
+            inv_update["safety_stock"] = data.safety_stock
+        supabase_client.table("inventory").update(inv_update).eq("product_id", product_id).execute()
 
         if change_amount != 0:
             supabase_client.table("inventory_logs").insert({

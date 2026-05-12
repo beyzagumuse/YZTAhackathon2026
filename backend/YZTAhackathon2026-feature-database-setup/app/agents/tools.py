@@ -1,24 +1,39 @@
 from app.core.supabase_client import supabase_client
 
+def normalize_tr(text: str) -> str:
+    """Türkçe karakterleri güvenli bir şekilde küçültür ve aramayı esnek hale getirir."""
+    if not text: return ""
+    return text.replace("I", "ı").replace("İ", "i").replace("Ğ", "ğ").replace("Ü", "ü").replace("Ş", "ş").replace("Ö", "ö").replace("Ç", "ç").lower()
+
 def check_stock_and_price(product_name: str) -> str:
     """
     Ürün adı verildiğinde ürünün fiyatını ve güncel stok miktarını döndürür.
     Müşteriler ürünlerin stokta olup olmadığını veya fiyatını sorduğunda bu aracı kullanın.
     """
     try:
-        # 1. Ürünü adına göre ara (ilike sayesinde büyük/küçük harf duyarsız kısmi arama yapar)
-        res = supabase_client.table("products").select("id, name, price").ilike("name", f"%{product_name}%").execute()
+        # 1. Tüm ürünleri çek ve Python'da Türkçe destekli esnek arama yap
+        res = supabase_client.table("products").select("id, name, price").execute()
         
         if not res.data:
-            return f"Maalesef stoklarımızda '{product_name}' adında bir ürün bulamadım."
+            return "Sistemde hiç kayıtlı ürün bulunamadı."
         
-        product = res.data[0] # İlk eşleşen ürünü al
+        search_term = normalize_tr(product_name)
+        matched_product = None
+        
+        for p in res.data:
+            # "salkım" kelimesi "SALKIM DOMATES" içinde geçiyor mu diye kontrol eder
+            if search_term in normalize_tr(p["name"]):
+                matched_product = p
+                break
+        
+        if not matched_product:
+            return f"Maalesef stoklarımızda '{product_name}' kelimesini içeren bir ürün bulamadım."
         
         # 2. Ürünün stok bilgisini inventory tablosundan çek
-        inv_res = supabase_client.table("inventory").select("quantity").eq("product_id", product["id"]).execute()
+        inv_res = supabase_client.table("inventory").select("quantity").eq("product_id", matched_product["id"]).execute()
         stock = inv_res.data[0]["quantity"] if inv_res.data else 0
         
-        return f"Ürün: {product['name']}, Fiyat: {product['price']} TL, Güncel Stok: {stock} adet."
+        return f"Ürün: {matched_product['name']}, Fiyat: {matched_product['price']} TL, Güncel Stok: {stock} adet."
     except Exception as e:
         return f"Stok sorgulanırken sistemde bir hata oluştu: {str(e)}"
     

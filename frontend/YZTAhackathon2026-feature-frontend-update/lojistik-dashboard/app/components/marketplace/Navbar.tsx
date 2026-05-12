@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingBag, Search, User, Heart, MapPin, UserPlus, Box, MessageSquare, Ticket, Coins, LogOut, ChevronDown, ShoppingCart } from 'lucide-react';
 
-export default function Navbar({ isLoggedIn, userName, cartCount = 0, onAuthClick, onLogout, onNavigateToPanel, onCartClick, onHomeClick }: any) {
+export default function Navbar({ isLoggedIn, userName, cartCount = 0, onAuthClick, onLogout, onNavigateToPanel, onCartClick, onHomeClick, onSearch, searchQuery = '' }: any) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -24,7 +24,13 @@ export default function Navbar({ isLoggedIn, userName, cartCount = 0, onAuthClic
             SMARTOPS <span className="text-slate-800">KOOPERATİF</span>
           </div>
           <div className="hidden md:flex relative w-[400px]">
-            <input type="text" placeholder="Ürün veya kooperatif ara..." className="w-full bg-slate-100 rounded-full py-2.5 px-6 pl-12 text-sm outline-none focus:ring-2 ring-emerald-100 transition-all"/>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => onSearch?.(e.target.value)}
+              placeholder="Ürün veya kategori ara..."
+              className="w-full bg-slate-100 rounded-full py-2.5 px-6 pl-12 text-sm outline-none focus:ring-2 ring-emerald-100 transition-all"
+            />
             <Search className="absolute left-4 top-2.5 text-slate-400" size={18} />
           </div>
         </div>

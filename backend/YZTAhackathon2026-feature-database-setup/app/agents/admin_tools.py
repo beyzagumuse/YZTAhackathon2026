@@ -1,6 +1,5 @@
 from app.core.supabase_client import supabase_client
 
-
 def get_sales_ranking(order: str = "desc", limit: int = 5) -> str:
     """
     Ürünleri toplam satış adedine göre sıralar ve listeler.
@@ -101,12 +100,27 @@ def get_product_detail(product_name: str) -> str:
     Kullanıcı belirli bir ürün adı söylediğinde kullan.
     """
     try:
-        res = supabase_client.table("products").select("id, name, price").ilike("name", f"%{product_name}%").execute()
+        # GÜNCELLEME: Tüm ürünleri çekip Python'da normalize ederek karşılaştırıyoruz
+        res = supabase_client.table("products").select("id, name, price").execute()
         if not res.data:
-            return f"'{product_name}' adında ürün bulunamadı."
+            return f"'{product_name}' kelimesiyle eşleşen ürün bulunamadı."
+        
+        def normalize_tr(text: str) -> str:
+            if not text: return ""
+            return text.replace("I", "ı").replace("İ", "i").replace("Ğ", "ğ").replace("Ü", "ü").replace("Ş", "ş").replace("Ö", "ö").replace("Ç", "ç").lower()
+        
+        search_term = normalize_tr(product_name)
+        matched_product = None
+        
+        for p in res.data:
+            if search_term in normalize_tr(p["name"]):
+                matched_product = p
+                break
 
-        product = res.data[0]
-        pid = product["id"]
+        if not matched_product:
+            return f"'{product_name}' kelimesini içeren bir ürün bulunamadı."
+
+        pid = matched_product["id"]
 
         inv = supabase_client.table("inventory").select("quantity").eq("product_id", pid).execute()
         stock = inv.data[0]["quantity"] if inv.data else 0
@@ -115,8 +129,8 @@ def get_product_detail(product_name: str) -> str:
         total_sold = sum(i.get("quantity", 0) for i in sold_res)
 
         return (
-            f"Ürün: {product['name']}\n"
-            f"Fiyat: {product['price']} TL\n"
+            f"Ürün: {matched_product['name']}\n"
+            f"Fiyat: {matched_product['price']} TL\n"
             f"Mevcut stok: {stock} adet\n"
             f"Toplam satılan: {total_sold} adet"
         )
@@ -176,3 +190,41 @@ def list_all_customers() -> str:
         return output
     except Exception as e:
         return f"Müşteri listesi hatası: {str(e)}"
+
+
+def get_anomalies() -> str:
+    """
+    Stok anomalileri, emniyet stoğu altında veya yeniden sipariş noktası seviyesinde ürünleri listeler.
+    Anomali, emniyet stoğu, reorder point, yeniden sipariş sorularında kullan.
+    """
+    try:
+        # Emniyet stoğu eşiği (safety stock threshold)
+        SAFETY_STOCK = 10
+        # Yeniden sipariş noktası (reorder point)
+        REORDER_POINT = 5
+        
+        items = supabase_client.table("inventory").select("quantity, products(name)").execute().data or []
+        
+        if not items:
+            return "Stok verisi bulunamadı."
+        
+        anomalies = []
+        for item in items:
+            qty = item.get("quantity", 0)
+            name = (item.get("products") or {}).get("name", "?")
+            
+            if qty <= REORDER_POINT:
+                anomalies.append((name, qty, "Yeniden sipariş gerekli!"))
+            elif qty <= SAFETY_STOCK:
+                anomalies.append((name, qty, "Emniyet stoğu altında"))
+        
+        if not anomalies:
+            return "Stok anomalisi yok. Tüm ürünler normal seviyelerde."
+        
+        output = f"STOK ANOMALİLERİ ({len(anomalies)} ürün):\n"
+        for name, qty, status in sorted(anomalies, key=lambda x: x[1]):
+            output += f"- {name}: {qty} adet - {status}\n"
+        
+        return output
+    except Exception as e:
+        return f"Anomali analizi hatası: {str(e)}"
