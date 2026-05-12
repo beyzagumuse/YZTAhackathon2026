@@ -31,9 +31,9 @@ async def update_stock(update_data: InventoryChange):
         raise HTTPException(status_code=500, detail=str(e))
 
 async def get_all_inventory():
-    """List current stock levels for all products."""
+    """List current stock levels for all products with product names."""
     try:
-        res = supabase_client.table("inventory").select("*").execute()
+        res = supabase_client.table("inventory").select("*, products(name, price)").execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

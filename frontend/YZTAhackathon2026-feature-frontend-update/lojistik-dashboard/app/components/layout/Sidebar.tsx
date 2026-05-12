@@ -1,54 +1,46 @@
 import React from 'react';
-import { Package, PlusCircle, Layers, ShoppingBag, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, ShoppingBag, LogOut, PackagePlus, Truck, Package } from 'lucide-react';
 
-export default function Sidebar({ isAdmin, activeTab, setActiveTab, onLogout }: any) {
-  // Menü elemanları: adminOnly true ise sadece adminler görebilir
-  const menuItems = [
-    { id: 'ürünler', label: 'Ürün Listesi', icon: <Package size={20} />, adminOnly: false },
-    { id: 'ürün_ekle', label: 'Yeni Ürün Ekle', icon: <PlusCircle size={20} />, adminOnly: true },
-    { id: 'stok', label: 'Stok Yönetimi', icon: <Layers size={20} />, adminOnly: true },
-    { id: 'siparişler', label: 'Siparişler', icon: <ShoppingBag size={20} />, adminOnly: true },
-    { id: 'müşteriler', label: 'Müşteriler', icon: <Users size={20} />, adminOnly: true },
-  ];
+export default function Sidebar({ role, activeTab, setActiveTab, onLogout }: any) {
+  const btn = (tab: string, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`flex items-center gap-3 w-full p-4 rounded-xl text-xs font-bold uppercase transition-all ${activeTab === tab ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}
+    >
+      {icon} {label}
+    </button>
+  );
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-100 flex-col hidden md:flex h-screen sticky top-0">
-      <div className="p-6 border-b border-slate-100">
-        <h1 className="text-2xl font-black text-emerald-600 tracking-tighter">SmartOps</h1>
-        <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-1">Gelişmiş ERP Paneli</p>
+    <aside className="w-72 bg-white border-r border-slate-100 p-8 flex flex-col">
+      <div className="flex items-center gap-3 mb-12">
+        <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+          <ShoppingBag size={20} />
+        </div>
+        <span className="font-black text-xl tracking-tighter text-slate-900 italic">SMARTOPS</span>
       </div>
-      
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {menuItems.map(item => {
-          // Eğer sekme sadece adminler içinse ve kullanıcı admin değilse, bu butonu çizme
-          if (item.adminOnly && !isAdmin) return null;
-          
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all ${
-                activeTab === item.id 
-                  ? 'bg-emerald-50 text-emerald-600 shadow-sm' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          );
-        })}
+
+      <nav className="flex-1 space-y-2">
+        {btn('panel', <LayoutDashboard size={18}/>, 'Panel')}
+
+        {role === 'admin' && (
+          <>
+            {btn('admin-orders', <Package size={18}/>, 'Siparişler')}
+            {btn('admin-stock',  <Truck size={18}/>,   'Stok')}
+            {btn('add-product',  <PackagePlus size={18}/>, 'Ürün Ekle')}
+            {btn('users',        <Users size={18}/>,   'Kullanıcılar')}
+            {btn('settings',     <Settings size={18}/>, 'Ayarlar')}
+          </>
+        )}
+
+        {role === 'kayıtlıuser' && (
+          btn('orders', <ShoppingBag size={18}/>, 'Siparişlerim')
+        )}
       </nav>
 
-      <div className="p-4 border-t border-slate-100">
-        <button 
-          onClick={onLogout} 
-          className="w-full flex items-center gap-3 px-4 py-3 text-rose-500 font-bold hover:bg-rose-50 rounded-2xl transition-all"
-        >
-          <LogOut size={20} />
-          Çıkış Yap
-        </button>
-      </div>
+      <button onClick={onLogout} className="mt-auto p-4 text-rose-500 text-[10px] font-black uppercase flex items-center gap-2 hover:bg-rose-50 rounded-xl transition-colors">
+        <LogOut size={16} /> Çıkış Yap
+      </button>
     </aside>
   );
 }

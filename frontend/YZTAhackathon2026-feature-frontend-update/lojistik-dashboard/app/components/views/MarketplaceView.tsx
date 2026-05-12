@@ -6,80 +6,116 @@ import ProductGrid from '../marketplace/ProductGrid';
 import CartView from '../marketplace/CartView';
 import AuthPages from '../auth/AuthPages';
 
-export default function MarketplaceView({ 
-  currentView, 
-  setCurrentView, 
-  isLoggedIn, 
-  userName, 
-  cart, 
-  setCart, 
-  currentUserId, 
-  onAuthAction, 
-  onLogout 
-}: any) {
+export default function MarketplaceView({ onDashboardClick }: { onDashboardClick: () => void }) {
   const [showCart, setShowCart] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [cart, setCart] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
 
-  // Giriş başarılı olduğunda yapılacaklar
-  const handleLoginSuccess = (userData: any) => {
-    setShowAuth(false);
+  // Kullanıcı oturumunu kontrol et
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) setUser(JSON.parse(savedUser));
+  }, []);
+
+  const addToCart = (product: any) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id 
+          ? { ...item, quantity: item.quantity + 1 } 
+          : item
+        );
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
   };
 
-  // Eğer giriş yapılması gerekiyorsa Auth ekranını göster
+  // KRİTİK FONKSİYON: Siparişi Backend'e Gönderir
+  const handleCheckout = async (address: string) => {
+    if (!user) {
+      setShowAuth(true);
+      return;
+    }
+
+    if (cart.length === 0) {
+      alert("Sepetiniz boş!");
+      return;
+    }
+
+    try {
+      // Backend'in beklediği 'OrderCreate' şemasına tam uyumlu veri yapısı
+      const orderData = {
+        customer_id: user.id, // Supabase user ID (UUID)
+        address: address,      // Kullanıcının sepet ekranında girdiği adres
+        items: cart.map(item => ({
+          product_id: item.id, // Ürün ID'si
+          quantity: item.quantity,
+          unit_price_at_sale: item.price
+        }))
+      };
+
+      const response = await fetch("http://localhost:8000/orders/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert("Siparişiniz başarıyla alındı! Sipariş No: " + result.order_id);
+        setCart([]); // Sepeti boşalt
+        setShowCart(false);
+      } else {
+        alert("Hata: " + (result.detail || "Sipariş kaydedilemedi."));
+      }
+    } catch (error) {
+      console.error("Sipariş hatası:", error);
+      alert("Sunucuya bağlanılamadı.");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    alert("Çıkış yapıldı.");
+  };
+
   if (showAuth) {
-    return (
-      <AuthPages 
-        onBack={() => setShowAuth(false)} 
-        // HATA BURADAYDI: onAuthAction artık alt bileşene aktarılıyor
-        onAuthAction={onAuthAction} 
-        onLoginSuccess={handleLoginSuccess} 
-      />
-    );
+    return <AuthPages onBack={() => setShowAuth(false)} onLoginSuccess={(userData) => {
+      setUser(userData);
+      setShowAuth(false);
+    }} />;
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar 
-        cartCount={cart.reduce((sum: number, item: any) => sum + item.quantity, 0)}
+        cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
         onCartClick={() => setShowCart(true)}
         onAuthClick={() => setShowAuth(true)}
-        onDashboardClick={() => setCurrentView('panel')}
-        user={isLoggedIn ? { full_name: userName } : null}
-        onLogout={onLogout}
+        onDashboardClick={onDashboardClick}
+        user={user}
+        onLogout={handleLogout}
       />
       
       <main className="max-w-7xl mx-auto px-6 pb-24">
         <Hero />
         <CategoryGrid />
-        <ProductGrid onAddToCart={(p: any) => {
-          setCart((prev: any) => {
-            const existing = prev.find((i: any) => i.id === p.id);
-            if (existing) {
-              return prev.map((i: any) => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
-            }
-            return [...prev, { ...p, quantity: 1 }];
-          });
-        }} />
+        <ProductGrid onAddToCart={addToCart} />
       </main>
 
       {showCart && (
         <CartView 
           items={cart} 
           onClose={() => setShowCart(false)}
-          onUpdateQuantity={(id: string, delta: number) => {
-            setCart((prev: any) => prev.map((i: any) => 
-              i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i
-            ).filter((i: any) => i.quantity > 0));
+          onUpdateQuantity={(id, delta) => {
+            setCart(prev => prev.map(item => 
+              item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
+            ).filter(item => item.quantity > 0));
           }}
-          onCheckout={() => {
-            if (!isLoggedIn) {
-              setShowAuth(true);
-              setShowCart(false);
-            } else {
-              // Sipariş tamamlama mantığı buraya gelecek
-              alert("Sipariş işleniyor...");
-            }
-          }}
+          onCheckout={handleCheckout} 
         />
       )}
     </div>

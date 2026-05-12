@@ -26,13 +26,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Tüm modüllerin rotaları uygulamaya dahil ediliyor
+# Tüm modüllerin rotalarını uygulamaya dahil ediyoruz
 app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(inventory.router)
 app.include_router(orders.router)
 app.include_router(profiles.router)
 app.include_router(shadow_profiles.router)
+# ÇÖZÜM: 'shipping.router' yerine 'shipment.router' eklendi
 app.include_router(shipment.router)
 app.include_router(chat.router)
 

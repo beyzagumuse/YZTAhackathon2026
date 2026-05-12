@@ -84,13 +84,39 @@ async def create_order(order_data: OrderCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 async def update_order_status(order_id: str, status: str):
-    """Update an order's status explicitly."""
+    """Update an order's status; auto-creates shipping on 'shipped', closes it on 'delivered'."""
+    import random, string
     try:
         res = supabase_client.table("orders").update({"status": status}).eq("id", order_id).execute()
         if not res.data:
             raise HTTPException(status_code=404, detail="Order not found")
+
+        if status == "shipped":
+            tracking = "TRK" + "".join(random.choices(string.digits, k=9))
+            existing = supabase_client.table("shipping").select("id").eq("order_id", order_id).execute()
+            if not existing.data:
+                supabase_client.table("shipping").insert({
+                    "order_id": order_id,
+                    "carrier_name": "Aras Kargo",
+                    "tracking_number": tracking,
+                    "status": "in_transit",
+                }).execute()
+            else:
+                supabase_client.table("shipping").update({"status": "in_transit"}).eq("order_id", order_id).execute()
+
+        elif status == "delivered":
+            supabase_client.table("shipping").update({"status": "delivered"}).eq("order_id", order_id).execute()
+
         return res.data[0]
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
+    
+async def get_orders(customer_id: str = None):
+    query = supabase_client.table("orders").select("*, profiles(full_name, email), order_items(*, products(name))")
+    if customer_id:
+        query = query.eq("customer_id", customer_id)
+    
+    res = query.order("created_at", desc=True).execute()
+    return res.data
