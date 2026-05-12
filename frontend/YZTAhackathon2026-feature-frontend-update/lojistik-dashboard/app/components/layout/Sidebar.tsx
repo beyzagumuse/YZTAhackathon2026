@@ -1,7 +1,16 @@
 import React from 'react';
-import { LayoutDashboard, Users, Settings, ShoppingBag, LogOut, PackagePlus } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, ShoppingBag, LogOut, PackagePlus, Truck, Package } from 'lucide-react';
 
 export default function Sidebar({ role, activeTab, setActiveTab, onLogout }: any) {
+  const btn = (tab: string, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`flex items-center gap-3 w-full p-4 rounded-xl text-xs font-bold uppercase transition-all ${activeTab === tab ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}
+    >
+      {icon} {label}
+    </button>
+  );
+
   return (
     <aside className="w-72 bg-white border-r border-slate-100 p-8 flex flex-col">
       <div className="flex items-center gap-3 mb-12">
@@ -10,30 +19,22 @@ export default function Sidebar({ role, activeTab, setActiveTab, onLogout }: any
         </div>
         <span className="font-black text-xl tracking-tighter text-slate-900 italic">SMARTOPS</span>
       </div>
-      
+
       <nav className="flex-1 space-y-2">
-        <button 
-          onClick={() => setActiveTab('panel')}
-          className={`flex items-center gap-3 w-full p-4 rounded-xl text-xs font-bold uppercase transition-all ${activeTab === 'panel' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}
-        >
-          <LayoutDashboard size={18} /> Panel
-        </button>
-        
+        {btn('panel', <LayoutDashboard size={18}/>, 'Panel')}
+
         {role === 'admin' && (
           <>
-            <button onClick={() => setActiveTab('users')} className={`flex items-center gap-3 w-full p-4 rounded-xl text-xs font-bold uppercase transition-all ${activeTab === 'users' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}><Users size={18} /> Kullanıcılar</button>
-            <button onClick={() => setActiveTab('add-product')} className={`flex items-center gap-3 w-full p-4 rounded-xl text-xs font-bold uppercase transition-all ${activeTab === 'add-product' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}><PackagePlus size={18} /> Ürün Ekle</button>
-            <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 w-full p-4 rounded-xl text-xs font-bold uppercase transition-all ${activeTab === 'settings' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}><Settings size={18} /> Ayarlar</button>
+            {btn('admin-orders', <Package size={18}/>, 'Siparişler')}
+            {btn('admin-stock',  <Truck size={18}/>,   'Stok')}
+            {btn('add-product',  <PackagePlus size={18}/>, 'Ürün Ekle')}
+            {btn('users',        <Users size={18}/>,   'Kullanıcılar')}
+            {btn('settings',     <Settings size={18}/>, 'Ayarlar')}
           </>
         )}
 
         {role === 'kayıtlıuser' && (
-          <button 
-            onClick={() => setActiveTab('orders')}
-            className={`flex items-center gap-3 w-full p-4 rounded-xl text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}
-          >
-            <ShoppingBag size={18} /> Siparişlerim
-          </button>
+          btn('orders', <ShoppingBag size={18}/>, 'Siparişlerim')
         )}
       </nav>
 

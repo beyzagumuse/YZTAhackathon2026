@@ -11,6 +11,9 @@ import Header from './components/layout/Header';
 import AdminView from './components/dashboard/AdminView';
 import CustomerView from './components/dashboard/CustomerView';
 import AddProductView from './components/dashboard/AddProductView';
+import AdminOrdersView from './components/dashboard/AdminOrdersView';
+import AdminStockView from './components/dashboard/AdminStockView';
+import ChatWidget from './components/marketplace/ChatWidget';
 
 type Role = 'admin' | 'kayıtlıuser';
 type ViewMode = 'home' | 'panel' | 'cart';
@@ -38,7 +41,7 @@ function OrdersView({ customerId, version }: { customerId: string; version: numb
 
   if (orders.length === 0) return (
     <div className="space-y-4">
-      <h2 className="text-3xl font-black italic">Geçmiş Siparişlerim</h2>
+      <h2 className="text-3xl font-black italic text-slate-900">Geçmiş Siparişlerim</h2>
       <div className="bg-slate-50 p-20 rounded-[48px] text-center">
         <p className="text-slate-400 font-bold uppercase text-xs">Henüz sipariş bulunmuyor.</p>
       </div>
@@ -47,13 +50,13 @@ function OrdersView({ customerId, version }: { customerId: string; version: numb
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-black italic">Geçmiş Siparişlerim</h2>
+      <h2 className="text-3xl font-black italic text-slate-900">Geçmiş Siparişlerim</h2>
       {orders.map((order: any) => {
         const s = STATUS_LABELS[order.status] ?? { label: order.status, color: 'bg-slate-100 text-slate-600' };
         return (
           <div key={order.id} className="bg-slate-50 rounded-[32px] p-8 border border-slate-100 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-black text-sm uppercase tracking-wider">Sipariş #{order.id.slice(0,8).toUpperCase()}</span>
+              <span className="font-black text-sm uppercase tracking-wider text-slate-900">Sipariş #{order.id.slice(0,8).toUpperCase()}</span>
               <span className={`text-xs font-black uppercase px-4 py-2 rounded-full ${s.color}`}>{s.label}</span>
             </div>
             <div className="text-xs text-slate-400">{new Date(order.created_at).toLocaleDateString('tr-TR', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
@@ -61,8 +64,8 @@ function OrdersView({ customerId, version }: { customerId: string; version: numb
               <ul className="text-sm text-slate-600 space-y-1 pt-1 border-t border-slate-100 mt-2">
                 {order.order_items.map((item: any, i: number) => (
                   <li key={i} className="flex justify-between py-1">
-                    <span>{item.products?.name ?? 'Ürün'} <span className="text-slate-400">×{item.quantity}</span></span>
-                    <span className="font-bold">{(item.quantity * item.unit_price_at_sale).toFixed(2)} ₺</span>
+                    <span className="text-slate-900">{item.products?.name ?? 'Ürün'} <span className="text-slate-400">×{item.quantity}</span></span>
+                    <span className="font-bold text-slate-900">{(item.quantity * item.unit_price_at_sale).toFixed(2)} ₺</span>
                   </li>
                 ))}
               </ul>
@@ -107,6 +110,15 @@ export default function SmartOpsDashboard() {
     setCart(prev => prev.filter(item => item.id !== productId));
   };
 
+  // ÇIKIŞ İŞLEMİ
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setRole('kayıtlıuser');
+    setUserName("");
+    setCurrentUserId(""); // Chatbot'un sıfırlanması için ID'yi temizliyoruz
+    setCurrentView('home');
+  };
+
   // KULLANICI GİRİŞ/KAYIT VE MİSAFİR YÖNETİMİ
   const handleAuthAction = async (type: string, data: any) => {
     try {
@@ -123,11 +135,10 @@ export default function SmartOpsDashboard() {
         setUserName(json.user.full_name || json.user.email.split('@')[0]);
         setShowAuth(false);
         
-        // Adminse otomatik Panel açılsın
         if (json.role === 'admin') {
           setCurrentView('panel');
         } else if (currentView === 'cart') {
-          submitOrderToBackend(json.user.id); // Kullanıcı sepetteyken girdiyse siparişi at
+          submitOrderToBackend(json.user.id);
         } else {
           setCurrentView('home');
         }
@@ -159,7 +170,6 @@ export default function SmartOpsDashboard() {
     }
   };
 
-  // SİPARİŞİ VERİTABANINA YAZ
   const submitOrderToBackend = async (customerId: string, address: string = "Kayıtlı Adres") => {
     const orderPayload = {
       customer_id: customerId,
@@ -188,7 +198,7 @@ export default function SmartOpsDashboard() {
       <div className="min-h-screen bg-white font-sans text-slate-900">
         <Navbar isLoggedIn={isLoggedIn} userName={userName} cartCount={cart.length}
           onAuthClick={(view: any) => { setAuthView(view); setShowAuth(true); }} 
-          onLogout={() => { setIsLoggedIn(false); setRole('kayıtlıuser'); setUserName(""); setCurrentView('home'); }}
+          onLogout={handleLogout}
           onNavigateToPanel={() => setCurrentView('panel')} onCartClick={() => setCurrentView('cart')} onHomeClick={() => setCurrentView('home')}
         />
         <main className="p-8 md:p-12 max-w-7xl mx-auto">
@@ -206,6 +216,8 @@ export default function SmartOpsDashboard() {
         {showAuth && (
            <AuthPages initialView={authView} allowGuest={currentView === 'cart'} onClose={() => setShowAuth(false)} onAuthAction={handleAuthAction} />
         )}
+        {/* Chatbot'a isAdmin yetkisini gönderiyoruz */}
+        <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
       </div>
     );
   }
@@ -213,19 +225,24 @@ export default function SmartOpsDashboard() {
   // RENDER - YÖNETİM PANELİ (ERP)
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
-      <Sidebar role={role} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={() => {setIsLoggedIn(false); setRole('kayıtlıuser'); setCurrentView('home');}} />
+      <Sidebar role={role} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <main className="flex-1 overflow-y-auto p-12 bg-white rounded-l-[48px] shadow-2xl border-l border-slate-100 relative">
         <button onClick={() => setCurrentView('home')} className="mb-6 flex items-center gap-2 text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-all">← Mağazaya Geri Dön</button>
         <Header role={role} />
         <div className="mt-8">
-          {activeTab === 'panel' ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
-          : activeTab === 'add-product' ? ( <AddProductView /> )
-          : activeTab === 'orders' ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
+          {activeTab === 'panel'        ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
+          : activeTab === 'admin-orders' ? ( <AdminOrdersView /> )
+          : activeTab === 'admin-stock'  ? ( <AdminStockView /> )
+          : activeTab === 'add-product'  ? ( <AddProductView /> )
+          : activeTab === 'orders'       ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
           : (
-             <div className="p-20 text-center border-2 border-dashed border-slate-100 rounded-[48px]"><h2 className="text-2xl font-black text-slate-300 uppercase">{activeTab.toUpperCase()} Modülü</h2></div>
+             <div className="p-20 text-center border-2 border-dashed border-slate-100 rounded-[48px]"><h2 className="text-2xl font-black text-slate-300 uppercase">{(activeTab || 'PANEL').replace('-', ' ')} Modülü</h2></div>
           )}
         </div>
       </main>
+      
+      {/* Yönetim panelinde de admin yetkili chatbot */}
+      <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
     </div>
   );
 }
