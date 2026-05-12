@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
-from app.services import chat_service
 from app.agents import gemini_service
 from app.agents import admin_service
 
@@ -33,5 +32,5 @@ async def admin_chat(body: ChatRequest):
 @router.post("/customer")
 async def customer_chat(body: CustomerChatRequest):
     """Müşteri chatbotu — function calling ile sipariş ve stok sorgulama."""
-    reply = await gemini_service.chat_with_agent(body.message, body.session_id)
+    reply = await gemini_service.chat_with_agent(body.message, body.customer_id, body.session_id)
     return {"reply": reply}

@@ -14,13 +14,32 @@ function generateSessionId() {
 export default function ChatWidget({ customerId }: { customerId?: string }) {
   const [open, setOpen] = useState(false);
   const sessionIdRef = useRef<string>(generateSessionId());
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'bot', text: 'Merhaba! Size nasıl yardımcı olabilirim? Sipariş durumu, ürün fiyatı veya stok hakkında sorabilirsiniz.' }
-  ]);
+  
+  const initialMessage: Message = { 
+    role: 'bot', 
+    text: 'Merhaba! Size nasıl yardımcı olabilirim? Sipariş durumu, ürün fiyatı veya stok hakkında sorabilirsiniz.' 
+  };
+  
+  const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // KULLANICI DEĞİŞTİĞİNDE SOHBETİ SIFIRLA
+  useEffect(() => {
+    setMessages([initialMessage]);
+    sessionIdRef.current = generateSessionId(); 
+  }, [customerId]);
+
+  // YENİ EKLENEN KISIM: PENCERE KAPANDIĞINDA SOHBETİ SIFIRLA
+  useEffect(() => {
+    if (!open) {
+      setMessages([initialMessage]);
+      sessionIdRef.current = generateSessionId();
+    }
+  }, [open]);
+
+  // Yeni mesaj eklendiğinde en alta kaydırma işlemi
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
@@ -115,7 +134,7 @@ export default function ChatWidget({ customerId }: { customerId?: string }) {
               onKeyDown={e => e.key === 'Enter' && send()}
               placeholder="Mesajınızı yazın..."
               disabled={loading}
-              className="flex-1 text-sm border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 ring-emerald-500 disabled:opacity-50"
+              className="flex-1 text-sm border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 ring-emerald-500 disabled:opacity-50 text-slate-900 placeholder:text-slate-400"
             />
             <button
               onClick={send}

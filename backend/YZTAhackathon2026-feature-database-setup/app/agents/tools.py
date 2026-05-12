@@ -50,3 +50,32 @@ def get_order_status(order_id: str) -> str:
     
     except Exception as e:
         return f"Sipariş sorgulanırken veritabanında bir hata oluştu: {str(e)}"
+
+
+def list_user_orders(customer_id: str) -> str:
+    """
+    Giriş yapmış bir müşteriye (customer_id) ait geçmiş siparişleri listeler.
+    Kullanıcı siparişlerini sorduğunda bu aracı kullanarak ona ait siparişlerin listesini çekin.
+    """
+    if not customer_id or customer_id == 'Giriş yapılmamış' or customer_id == 'None':
+        return "Sistemsel uyarı: Siparişleri listelemek için kullanıcının giriş yapmış olması gerekiyor. Lütfen kullanıcıdan sipariş numarasını manuel olarak isteyin."
+    
+    try:
+        # Müşteriye ait siparişleri tarihe göre azalan (en yeni en üstte) sırayla çekiyoruz
+        res = supabase_client.table("orders").select("id, total_amount, status, created_at").eq("customer_id", customer_id).order("created_at", desc=True).execute()
+        
+        if not res.data:
+            return "Bu müşteriye ait hiçbir geçmiş sipariş bulunmuyor."
+        
+        orders_text = "Müşterinin Siparişleri:\n"
+        for i, order in enumerate(res.data):
+            # Tarihi okunabilir formata çevir (Örn: 2026-05-12)
+            date_str = order['created_at'].split('T')[0]
+            # Kısa ID (Kullanıcı seçerken kolaylık olsun diye ilk bölüm)
+            short_id = order['id'].split('-')[0]
+            
+            orders_text += f"{i+1}. Sipariş -> Tam ID: {order['id']} | Kısa ID: {short_id} | Tarih: {date_str} | Tutar: {order['total_amount']} TL | Durum: {order['status']}\n"
+        
+        return orders_text
+    except Exception as e:
+        return f"Siparişler listelenirken veritabanında bir hata oluştu: {str(e)}"

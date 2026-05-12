@@ -28,9 +28,10 @@ _sessions: Dict[str, List] = {}
 WINDOW_SIZE = 10
 
 
-async def chat_with_agent(user_message: str, session_id: str = None) -> str:
+async def chat_with_agent(user_message: str, customer_id: str = None, session_id: str = None) -> str:
     try:
-        history = _sessions.get(session_id, []) if session_id else []
+        history_key = session_id or customer_id
+        history = _sessions.get(history_key, []) if history_key else []
 
         chat = model.start_chat(
             history=history,
@@ -40,8 +41,8 @@ async def chat_with_agent(user_message: str, session_id: str = None) -> str:
 
         # Sliding window: chat.history tüm turları içerir (tool call dahil)
         # Son WINDOW_SIZE * 2 item'ı tut (~10 kullanıcı turu)
-        if session_id:
-            _sessions[session_id] = list(chat.history)[-(WINDOW_SIZE * 2):]
+        if history_key:
+            _sessions[history_key] = list(chat.history)[-(WINDOW_SIZE * 2):]
 
         return response.text
     except Exception as e:

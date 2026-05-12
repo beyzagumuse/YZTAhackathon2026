@@ -112,3 +112,11 @@ async def update_order_status(order_id: str, status: str):
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
+    
+async def get_orders(customer_id: str = None):
+    query = supabase_client.table("orders").select("*, profiles(full_name, email), order_items(*, products(name))")
+    if customer_id:
+        query = query.eq("customer_id", customer_id)
+    
+    res = query.order("created_at", desc=True).execute()
+    return res.data
