@@ -1,6 +1,29 @@
 from app.core.supabase_client import supabase_client
 
 
+def get_anomalies() -> str:
+    """
+    Stok miktarı emniyet stoğunun (reorder point) altında olan ürünleri listeler.
+    Anomali, kritik stok uyarısı, yeniden sipariş noktası, reorder point sorularında kullan.
+    """
+    try:
+        items = supabase_client.table("inventory").select("quantity, safety_stock, products(name)").execute().data or []
+        anomalies = [
+            i for i in items
+            if (i.get("safety_stock") or 0) > 0
+            and (i.get("quantity") or 0) < (i.get("safety_stock") or 0)
+        ]
+        if not anomalies:
+            return "Şu an anomali tespit edilmedi: tüm ürünlerin stoğu emniyet seviyesinin üzerinde."
+        lines = [
+            f"- {(i.get('products') or {}).get('name', '?')}: stok={i['quantity']}, emniyet stoğu={i['safety_stock']} (fark: {i['safety_stock'] - i['quantity']})"
+            for i in sorted(anomalies, key=lambda x: x["safety_stock"] - x["quantity"], reverse=True)
+        ]
+        return f"Emniyet stoğu altında {len(anomalies)} ürün (anomali):\n" + "\n".join(lines)
+    except Exception as e:
+        return f"Anomali verisi alınamadı (hata: {type(e).__name__}: {e})"
+
+
 def get_sales_ranking(order: str = "desc", limit: int = 5) -> str:
     """
     Ürünleri toplam satış adedine göre sıralar ve listeler.

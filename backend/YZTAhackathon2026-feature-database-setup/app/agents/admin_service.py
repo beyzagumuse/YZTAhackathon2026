@@ -6,6 +6,7 @@ from app.agents.admin_tools import (
     get_stock_status,
     get_order_statistics,
     get_product_detail,
+    get_anomalies,
 )
 from typing import Dict, List
 import httpx
@@ -20,14 +21,15 @@ KURALLAR:
 2. Stok, envanter, kritik stok sorularında DAİMA 'get_stock_status' aracını kullan.
 3. Ciro, gelir, kazanç, sipariş sayısı sorularında DAİMA 'get_order_statistics' aracını kullan.
 4. Belirli bir ürün sorulduğunda DAİMA 'get_product_detail' aracını kullan.
-5. Aracın döndürdüğü veri dışında tahminde bulunma.
-6. Yıldız (*) veya diyez (#) gibi markdown karakteri kullanma, düz metin yaz.
+5. Anomali, emniyet stoğu altı, reorder point, yeniden sipariş sorularında DAİMA 'get_anomalies' aracını kullan.
+6. Aracın döndürdüğü veri dışında tahminde bulunma.
+7. Yıldız (*) veya diyez (#) gibi markdown karakteri kullanma, düz metin yaz.
 """
 
 model = genai.GenerativeModel(
     model_name="gemini-2.0-flash",
     system_instruction=SYSTEM_PROMPT,
-    tools=[get_sales_ranking, get_stock_status, get_order_statistics, get_product_detail],
+    tools=[get_sales_ranking, get_stock_status, get_order_statistics, get_product_detail, get_anomalies],
 )
 
 _sessions: Dict[str, List] = {}
@@ -55,9 +57,18 @@ def _fetch_db_context() -> str:
         top5 = sorted(sales.items(), key=lambda x: x[1], reverse=True)[:5]
         bot5 = sorted(sales.items(), key=lambda x: x[1])[:5]
 
-        inv = supabase_client.table("inventory").select("quantity, products(name)").execute().data or []
+        inv = supabase_client.table("inventory").select("quantity, safety_stock, products(name)").execute().data or []
         critical = [(i.get("products", {}).get("name", "?"), i["quantity"]) for i in inv if (i.get("quantity") or 0) <= 5]
         low = sum(1 for i in inv if 5 < (i.get("quantity") or 0) <= 20)
+        anomalies = [
+            i for i in inv
+            if (i.get("safety_stock") or 0) > 0
+            and (i.get("quantity") or 0) < (i.get("safety_stock") or 0)
+        ]
+        anomaly_str = ', '.join(
+            f"{(i.get('products') or {}).get('name','?')}(stok={i['quantity']},emniyet={i['safety_stock']})"
+            for i in anomalies[:5]
+        ) or 'yok'
 
         return f"""Güncel sistem verileri (hallüsinasyon yapma, sadece bu verileri kullan):
 Siparişler: {len(orders)} toplam | {counts['pending']} hazırlanıyor | {counts['shipped']} kargoda | {counts['delivered']} teslim
@@ -65,7 +76,8 @@ Toplam ciro: {revenue:,.2f} TL
 En çok satan 5 ürün: {', '.join(f'{n}({q})' for n, q in top5)}
 En az satan 5 ürün: {', '.join(f'{n}({q})' for n, q in bot5)}
 Kritik stok (<=5): {', '.join(f'{n}:{q}' for n, q in critical[:5]) or 'yok'}
-Düşük stok (6-20): {low} ürün"""
+Düşük stok (6-20): {low} ürün
+Anomaliler (stok < emniyet stoğu): {len(anomalies)} ürün — {anomaly_str}"""
     except Exception as e:
         return f"Veri alınamadı: {e}"
 

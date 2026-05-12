@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Truck, Box, MapPin, AlertCircle, Send, Bot, Loader2 } from 'lucide-react';
 
@@ -25,6 +25,14 @@ export default function AdminView() {
   const [isLoading, setIsLoading] = useState(false);
   const [model, setModel] = useState<Model>('gemini');
   const sessionIdRef = useRef<string>('admin-' + Math.random().toString(36).slice(2));
+  const [anomalyCount, setAnomalyCount] = useState<string>('—');
+
+  useEffect(() => {
+    fetch('http://localhost:8000/inventory/anomalies')
+      .then(r => r.json())
+      .then(data => setAnomalyCount(Array.isArray(data) ? String(data.length).padStart(2, '0') : '—'))
+      .catch(() => {});
+  }, []);
 
   const handleAskAi = async () => {
     const text = chatInput.trim();
@@ -55,7 +63,7 @@ export default function AdminView() {
           { label: 'Aktif Araç',      val: '3,120', color: 'text-blue-600',    icon: <Truck size={16}/> },
           { label: 'İşlemdeki Paket', val: '185k',  color: 'text-slate-800',   icon: <Box size={16}/> },
           { label: 'Varış Merkezi',   val: '412',   color: 'text-emerald-600', icon: <MapPin size={16}/> },
-          { label: 'Kritik Anomali',  val: '03',    color: 'text-rose-600',    icon: <AlertCircle size={16}/> },
+          { label: 'Kritik Anomali',  val: anomalyCount, color: 'text-rose-600', icon: <AlertCircle size={16}/> },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
             <div className="flex items-center justify-between mb-4">

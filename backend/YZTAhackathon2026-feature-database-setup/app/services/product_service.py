@@ -11,6 +11,34 @@ async def list_products():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+async def get_categories():
+    """Return distinct descriptions (used as categories) with product counts."""
+    try:
+        res = supabase_client.table("products").select("description").execute()
+        counts: dict = {}
+        for r in res.data:
+            cat = r.get("description")
+            if cat:
+                counts[cat] = counts.get(cat, 0) + 1
+        return [{"name": name, "count": count} for name, count in sorted(counts.items())]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def search_products(q: str = "", category: str = ""):
+    """Search products by name (ilike) and optionally filter by description/category."""
+    try:
+        query = supabase_client.table("products").select("*")
+        if q:
+            query = query.ilike("name", f"%{q}%")
+        if category:
+            query = query.eq("description", category)
+        res = query.execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 async def get_product(product_id: str):
     """Get details of a specific product."""
     try:

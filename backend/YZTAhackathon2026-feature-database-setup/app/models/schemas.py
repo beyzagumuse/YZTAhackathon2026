@@ -38,6 +38,7 @@ class InventoryChange(BaseModel):
 
 class InventoryUpdate(BaseModel):
     stock_quantity: int
+    safety_stock: Optional[int] = None
     reason: Optional[str] = "Manual Adjustment"
 
 class OrderItem(BaseModel):
