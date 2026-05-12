@@ -145,3 +145,59 @@ def get_product_detail(product_name: str) -> str:
         )
     except Exception as e:
         return f"Ürün detayı alınamadı (hata: {type(e).__name__}: {e})"
+
+
+def list_all_orders_for_admin() -> str:
+    """
+    Sistemdeki tüm siparişleri müşteri isimleri ve durumlarıyla listeler.
+    Admin 'tüm siparişleri göster', 'hangi müşteri sipariş verdi' gibi sorularda kullan.
+    """
+    try:
+        res = supabase_client.table("orders").select("*, profiles(full_name, email)").order("created_at", desc=True).execute()
+        if not res.data:
+            return "Sistemde henüz hiç sipariş bulunmuyor."
+        output = "Tüm siparişler:\n"
+        for o in res.data:
+            customer = (o.get("profiles") or {}).get("full_name", "Bilinmeyen")
+            output += f"- {o['id'][:8]} | {customer} | {o['total_amount']} TL | {o['status']} | {o['created_at'].split('T')[0]}\n"
+        return output
+    except Exception as e:
+        return f"Sipariş listesi alınamadı (hata: {type(e).__name__}: {e})"
+
+
+def get_inventory_report() -> str:
+    """
+    Tüm ürünlerin stok miktarlarını ve emniyet stoğu durumunu raporlar.
+    Detaylı stok raporu, tam envanter listesi sorularında kullan.
+    """
+    try:
+        res = supabase_client.table("inventory").select("quantity, safety_stock, products(name)").execute()
+        if not res.data:
+            return "Stok verisi bulunamadı."
+        lines = []
+        for item in res.data:
+            name = (item.get("products") or {}).get("name", "?")
+            qty = item.get("quantity", 0)
+            safety = item.get("safety_stock", 0)
+            flag = " [ANOMALİ]" if safety > 0 and qty < safety else (" [KRİTİK]" if qty <= 5 else "")
+            lines.append(f"- {name}: {qty} adet (emniyet: {safety}){flag}")
+        return "Stok raporu:\n" + "\n".join(lines)
+    except Exception as e:
+        return f"Stok raporu alınamadı (hata: {type(e).__name__}: {e})"
+
+
+def list_all_customers() -> str:
+    """
+    Sistemdeki tüm kayıtlı müşterileri listeler.
+    Müşteri sayısı, müşteri listesi, kim kayıtlı sorularında kullan.
+    """
+    try:
+        res = supabase_client.table("profiles").select("full_name, email, address").execute()
+        if not res.data:
+            return "Kayıtlı müşteri bulunamadı."
+        output = f"Kayıtlı müşteriler ({len(res.data)} kişi):\n"
+        for c in res.data:
+            output += f"- {c['full_name']} ({c['email']})\n"
+        return output
+    except Exception as e:
+        return f"Müşteri listesi alınamadı (hata: {type(e).__name__}: {e})"

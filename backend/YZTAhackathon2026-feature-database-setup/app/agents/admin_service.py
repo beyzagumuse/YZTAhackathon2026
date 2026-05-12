@@ -7,6 +7,9 @@ from app.agents.admin_tools import (
     get_order_statistics,
     get_product_detail,
     get_anomalies,
+    list_all_orders_for_admin,
+    get_inventory_report,
+    list_all_customers,
 )
 from typing import Dict, List
 import httpx
@@ -18,18 +21,23 @@ Sen SmartOps ERP sisteminin admin asistanısın. Türkçe, kısa ve analitik cev
 
 KURALLAR:
 1. Satış, en çok/az satan ürün sorularında DAİMA 'get_sales_ranking' aracını kullan.
-2. Stok, envanter, kritik stok sorularında DAİMA 'get_stock_status' aracını kullan.
+2. Stok, envanter, kritik stok sorularında DAİMA 'get_stock_status' veya 'get_inventory_report' aracını kullan.
 3. Ciro, gelir, kazanç, sipariş sayısı sorularında DAİMA 'get_order_statistics' aracını kullan.
 4. Belirli bir ürün sorulduğunda DAİMA 'get_product_detail' aracını kullan.
-5. Anomali, emniyet stoğu altı, reorder point, yeniden sipariş sorularında DAİMA 'get_anomalies' aracını kullan.
-6. Aracın döndürdüğü veri dışında tahminde bulunma.
-7. Yıldız (*) veya diyez (#) gibi markdown karakteri kullanma, düz metin yaz.
+5. Anomali, emniyet stoğu altı, reorder point sorularında DAİMA 'get_anomalies' aracını kullan.
+6. Tüm siparişleri veya müşteri bilgisini içeren sorularda 'list_all_orders_for_admin' veya 'list_all_customers' aracını kullan.
+7. Aracın döndürdüğü veri dışında tahminde bulunma.
+8. Yıldız (*) veya diyez (#) gibi markdown karakteri kullanma, düz metin yaz.
 """
 
 model = genai.GenerativeModel(
     model_name="gemini-2.0-flash",
     system_instruction=SYSTEM_PROMPT,
-    tools=[get_sales_ranking, get_stock_status, get_order_statistics, get_product_detail, get_anomalies],
+    tools=[
+        get_sales_ranking, get_stock_status, get_order_statistics,
+        get_product_detail, get_anomalies,
+        list_all_orders_for_admin, get_inventory_report, list_all_customers,
+    ],
 )
 
 _sessions: Dict[str, List] = {}

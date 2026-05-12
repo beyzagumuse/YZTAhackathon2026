@@ -113,6 +113,14 @@ export default function SmartOpsDashboard() {
     setCart(prev => prev.filter(item => item.id !== productId));
   };
 
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setRole('kayıtlıuser');
+    setUserName("");
+    setCurrentUserId("");
+    setCurrentView('home');
+  };
+
   // KULLANICI GİRİŞ/KAYIT VE MİSAFİR YÖNETİMİ
   const handleAuthAction = async (type: string, data: any) => {
     try {
@@ -194,7 +202,7 @@ export default function SmartOpsDashboard() {
       <div className="min-h-screen bg-white font-sans text-slate-900">
         <Navbar isLoggedIn={isLoggedIn} userName={userName} cartCount={cart.length}
           onAuthClick={(view: any) => { setAuthView(view); setShowAuth(true); }}
-          onLogout={() => { setIsLoggedIn(false); setRole('kayıtlıuser'); setUserName(""); setCurrentView('home'); }}
+          onLogout={handleLogout}
           onNavigateToPanel={() => setCurrentView('panel')} onCartClick={() => setCurrentView('cart')} onHomeClick={() => setCurrentView('home')}
           searchQuery={searchQuery} onSearch={(q: string) => { setSearchQuery(q); setSelectedCategory(''); }}
         />
@@ -220,7 +228,7 @@ export default function SmartOpsDashboard() {
         {showAuth && (
            <AuthPages initialView={authView} allowGuest={currentView === 'cart'} onClose={() => setShowAuth(false)} onAuthAction={handleAuthAction} />
         )}
-        <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} />
+        <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
       </div>
     );
   }
@@ -228,7 +236,7 @@ export default function SmartOpsDashboard() {
   // RENDER - YÖNETİM PANELİ (ERP)
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
-      <Sidebar role={role} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={() => {setIsLoggedIn(false); setRole('kayıtlıuser'); setCurrentView('home');}} />
+      <Sidebar role={role} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <main className="flex-1 overflow-y-auto p-12 bg-white rounded-l-[48px] shadow-2xl border-l border-slate-100 relative">
         <button onClick={() => setCurrentView('home')} className="mb-6 flex items-center gap-2 text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-all">← Mağazaya Geri Dön</button>
         <Header role={role} />
@@ -244,6 +252,7 @@ export default function SmartOpsDashboard() {
           )}
         </div>
       </main>
+      <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
     </div>
   );
 }
