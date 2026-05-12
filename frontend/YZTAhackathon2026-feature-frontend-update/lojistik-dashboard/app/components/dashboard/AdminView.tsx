@@ -156,7 +156,7 @@ export default function AdminView() {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_12px_#3b82f6]" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">
-                {model === 'gemini' ? 'Gemini 2.0 Flash' : 'Gemma4:31B (Local)'}
+                {model === 'gemini' ? 'Gemini 1.5 Flash' : 'Gemma4:31B (Local)'}
               </span>
             </div>
             {isLoading && <Loader2 size={14} className="text-blue-500 animate-spin" />}

@@ -31,7 +31,7 @@ KURALLAR:
 """
 
 model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash",
+    model_name="gemini-1.5-flash",
     system_instruction=SYSTEM_PROMPT,
     tools=[
         get_sales_ranking, get_stock_status, get_order_statistics,
@@ -121,4 +121,7 @@ Cevap:"""
             _sessions[session_id] = list(chat.history)[-(WINDOW_SIZE * 2):]
         return response.text
     except Exception as e:
+        err = str(e)
+        if "429" in err or "quota" in err.lower() or "ResourceExhausted" in type(e).__name__:
+            return "Gemini API günlük kotası doldu. Sağ üstteki 'Gemma4' butonuna geçerek yerel modeli kullanabilirsiniz."
         return f"Asistanda geçici bir sorun oluştu: {str(e)}"
