@@ -1,6 +1,14 @@
 import google.generativeai as genai
 from app.core.config import settings
-from app.agents.admin_tools import list_all_orders_for_admin, get_inventory_report, list_all_customers
+from app.agents.admin_tools import (
+    list_all_orders_for_admin, 
+    get_inventory_report, 
+    list_all_customers,
+    get_sales_ranking,
+    get_stock_status,
+    get_order_statistics,
+    get_product_detail
+)
 from typing import Dict, List
 
 # API Ayarı
@@ -11,23 +19,34 @@ ADMIN_SYSTEM_PROMPT = """
 Sen SmartOps ERP Sisteminin Kıdemli Analist ve Yönetici Asistanısın. 
 Sadece yöneticilerle muhatap oluyorsun, bu yüzden profesyonel, veri odaklı ve ciddi bir dil kullan.
 
-YETKİLERİN:
-1. Sistemdeki TÜM siparişleri görebilir ve analiz edebilirsin ('list_all_orders_for_admin').
-2. Tüm stok durumunu ve envanteri sorgulayabilirsin ('get_inventory_report').
-3. Tüm müşteri veritabanına erişebilirsin ('list_all_customers').
+YETKİLERİN VE ARAÇLARIN:
+1. Siparişler ve Finans:
+   - Sistemdeki TÜM siparişlerin listesini görmek için 'list_all_orders_for_admin' kullan.
+   - Toplam ciro, gelir, kazanç ve durum (kargoda/bekleyen vb.) istatistikleri için DAİMA 'get_order_statistics' kullan.
+   - En çok veya en az satan ürünleri listelemek için 'get_sales_ranking' kullan.
+2. Stok ve Envanter:
+   - Genel, kritik veya düşük stok durumu için 'get_stock_status' veya 'get_inventory_report' kullan.
+   - Belirli bir ürünün detayını, fiyatını ve toplam satışını görmek için 'get_product_detail' kullan.
+3. Müşteriler:
+   - Tüm müşteri veritabanına erişmek için 'list_all_customers' kullan.
 
 ANALİZ YETENEĞİ:
-- Siparişler listelendiğinde toplam ciro hesabı yapabilirsin.
-- Hangi müşterilerin daha aktif olduğunu veya hangi ürünlerin stoklarının bittiğini yorumlayabilirsin.
-- Atıl stoktaki ürünler için kampanya önerileri sunabilirsin.
-
-Cevaplarını Türkçe ve anlaşılır bir formatta ver.
+- Yöneticiler sana veritabanındaki siparişlerle ilgili soru sorduğunda, yukarıdaki araçları kullanarak tüm sistemi tara ve doğru veriyi sun.
+- Cevaplarını Türkçe ve anlaşılır bir formatta ver.
 """
 
 admin_model = genai.GenerativeModel(
     model_name="gemini-2.5-flash",
     system_instruction=ADMIN_SYSTEM_PROMPT,
-    tools=[list_all_orders_for_admin, get_inventory_report, list_all_customers]
+    tools=[
+        list_all_orders_for_admin, 
+        get_inventory_report, 
+        list_all_customers,
+        get_sales_ranking,
+        get_stock_status,
+        get_order_statistics,
+        get_product_detail
+    ]
 )
 
 _admin_sessions: Dict[str, List] = {}
