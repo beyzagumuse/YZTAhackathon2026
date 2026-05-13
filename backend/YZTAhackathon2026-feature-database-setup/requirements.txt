@@ -3,5 +3,8 @@ uvicorn
 supabase
 python-dotenv
 pydantic[email]
-google-generativeai 
+google-generativeai
 prometheus-fastapi-instrumentator
+pandas
+mlxtend
+numpy

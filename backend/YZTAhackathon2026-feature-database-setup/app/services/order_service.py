@@ -113,6 +113,69 @@ async def update_order_status(order_id: str, status: str):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
     
+async def get_stats():
+    """Aggregate dashboard stats: order counts, revenue, top products, category sales, stock summary."""
+    try:
+        orders = supabase_client.table("orders").select("status, total_amount").execute().data or []
+        counts = {"pending": 0, "shipped": 0, "delivered": 0}
+        revenue = 0.0
+        for o in orders:
+            s = o.get("status", "")
+            if s in counts:
+                counts[s] += 1
+            revenue += float(o.get("total_amount") or 0)
+
+        items = supabase_client.table("order_items").select("quantity, products(name, category)").execute().data or []
+        prod_sales: dict = {}
+        cat_sales: dict = {}
+        for item in items:
+            prod = item.get("products") or {}
+            name = prod.get("name") or "?"
+            cat = prod.get("category") or "Diğer"
+            qty = item.get("quantity") or 0
+            prod_sales[name] = prod_sales.get(name, 0) + qty
+            cat_sales[cat] = cat_sales.get(cat, 0) + qty
+
+        top_products = sorted(prod_sales.items(), key=lambda x: x[1], reverse=True)[:8]
+        category_sales = sorted(cat_sales.items(), key=lambda x: x[1], reverse=True)[:8]
+
+        inv = supabase_client.table("inventory").select("quantity, safety_stock, products(name)").execute().data or []
+        stock = {"critical": 0, "low": 0, "normal": 0}
+        anomaly_products = []
+        for i in inv:
+            q = i.get("quantity", 0)
+            s = i.get("safety_stock") or 0
+            if s > 0 and q < s:
+                anomaly_products.append({
+                    "name": (i.get("products") or {}).get("name", "?"),
+                    "quantity": q,
+                    "safety_stock": s,
+                    "diff": s - q,
+                })
+            if q <= 5:
+                stock["critical"] += 1
+            elif q <= 20:
+                stock["low"] += 1
+            else:
+                stock["normal"] += 1
+
+        anomaly_products.sort(key=lambda x: x["diff"], reverse=True)
+
+        return {
+            "total_orders": len(orders),
+            "pending": counts["pending"],
+            "shipped": counts["shipped"],
+            "delivered": counts["delivered"],
+            "total_revenue": round(revenue, 2),
+            "top_products": [{"name": n, "quantity": q} for n, q in top_products],
+            "category_sales": [{"category": c, "quantity": q} for c, q in category_sales],
+            "stock_summary": stock,
+            "anomaly_products": anomaly_products,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 async def get_orders(customer_id: str = None):
     query = supabase_client.table("orders").select("*, profiles(full_name, email), order_items(*, products(name))")
     if customer_id:

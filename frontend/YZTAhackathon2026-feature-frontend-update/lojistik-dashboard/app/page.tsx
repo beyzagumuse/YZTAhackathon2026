@@ -170,25 +170,43 @@ export default function SmartOpsDashboard() {
     }
   };
 
+  // SİPARİŞİ VERİTABANINA YAZ
   const submitOrderToBackend = async (customerId: string, address: string = "Kayıtlı Adres") => {
     const orderPayload = {
       customer_id: customerId,
       address: address,
-      items: cart.map(item => ({ product_id: item.id.toString(), quantity: item.quantity, unit_price_at_sale: item.price }))
+      items: cart.map(item => ({ 
+        product_id: item.id.toString(), 
+        quantity: item.quantity, 
+        unit_price_at_sale: item.price 
+      }))
     };
 
-    const res = await fetch("http://localhost:8000/orders/create", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(orderPayload)
-    });
+    try {
+      const res = await fetch("http://localhost:8000/orders/create", {
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify(orderPayload)
+      });
 
-    if (res.ok) {
-      alert("Sipariş başarıyla alındı!");
-      setCart([]);
-      setShowAuth(false);
-      setCurrentView('home');
-      setOrderVersion(v => v + 1);
-    } else {
-      alert("Siparişte bir hata oluştu.");
+      if (res.ok) {
+        const createdOrder = await res.json();
+        
+        // HATA BURADAYDI: createdOrder.id yerine createdOrder.order_id kullanmalıyız!
+        const orderShortId = createdOrder.order_id.slice(0, 8).toUpperCase();
+
+        alert(`Siparişiniz başarıyla alındı! \n\nSipariş Numaranız: #${orderShortId} \n\nLütfen bu numarayı not edin, chatbot üzerinden sipariş durumunuzu bu numara ile sorgulayabilirsiniz.`);
+        
+        setCart([]);
+        setShowAuth(false);
+        setCurrentView('home');
+        setOrderVersion(v => v + 1);
+      } else {
+        const errorData = await res.json();
+        alert(`Siparişte bir hata oluştu: ${errorData.detail || 'Bilinmeyen hata'}`);
+      }
+    } catch (error) {
+      alert("Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.");
     }
   };
 

@@ -10,6 +10,12 @@ async def list_orders(status: Optional[str] = None, date: Optional[str] = None, 
     """List all orders with optional filters (status, date, customer_id)."""
     return await order_service.list_orders(status, date, customer_id)
 
+@router.get("/stats")
+async def get_order_stats():
+    """Aggregated dashboard stats: counts, revenue, top products, category sales, stock summary."""
+    return await order_service.get_stats()
+
+
 @router.get("/{order_id}")
 async def get_order(order_id: str):
     """Get specific order details."""
