@@ -273,10 +273,10 @@ Geliştirme rehberi ve komutlar için `CLAUDE.md` dosyasına bakınız.
 
 ## Geliştirenler
 
-Ahmet Özdoğan
-Duran Utku Gebeş
-Emine Beyza Gümüş
-Ömer Faruk Yurtdakal
+- Ahmet Özdoğan
+- Duran Utku Gebeş
+- Emine Beyza Gümüş
+- Ömer Faruk Yurtdakal
 
 ---
 
