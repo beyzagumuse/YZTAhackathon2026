@@ -114,19 +114,11 @@ export default function SmartOpsDashboard() {
     setCart(prev => prev.filter(item => item.id !== productId));
   };
 
-<<<<<<< HEAD
-  // ÇIKIŞ İŞLEMİ
-=======
->>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
   const handleLogout = () => {
     setIsLoggedIn(false);
     setRole('kayıtlıuser');
     setUserName("");
-<<<<<<< HEAD
-    setCurrentUserId(""); // Chatbot'un sıfırlanması için ID'yi temizliyoruz
-=======
     setCurrentUserId("");
->>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
     setCurrentView('home');
   };
 
@@ -146,18 +138,10 @@ export default function SmartOpsDashboard() {
         setUserName(json.user.full_name || json.user.email.split('@')[0]);
         setShowAuth(false);
         
-<<<<<<< HEAD
         if (json.role === 'admin') {
           setCurrentView('panel');
         } else if (currentView === 'cart') {
           submitOrderToBackend(json.user.id);
-=======
-        // Adminse otomatik Panel açılsın
-        if (json.role === 'admin') {
-          setCurrentView('panel');
-        } else if (currentView === 'cart') {
-          submitOrderToBackend(json.user.id); // Kullanıcı sepetteyken girdiyse siparişi at
->>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
         } else {
           setCurrentView('home');
         }
@@ -261,10 +245,6 @@ export default function SmartOpsDashboard() {
         {showAuth && (
            <AuthPages initialView={authView} allowGuest={currentView === 'cart'} onClose={() => setShowAuth(false)} onAuthAction={handleAuthAction} />
         )}
-<<<<<<< HEAD
-        {/* Chatbot'a isAdmin yetkisini gönderiyoruz */}
-=======
->>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
         <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
       </div>
     );
@@ -290,11 +270,6 @@ export default function SmartOpsDashboard() {
           )}
         </div>
       </main>
-<<<<<<< HEAD
-      
-      {/* Yönetim panelinde de admin yetkili chatbot */}
-=======
->>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
       <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
     </div>
   );
