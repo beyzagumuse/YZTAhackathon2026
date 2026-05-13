@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # ÇÖZÜM: 'shipping' yerine 'shipment' yazıldı
-from app.api import auth, inventory, orders, products, profiles, shadow_profiles, shipment, chat
+from app.api import auth, inventory, orders, products, profiles, shadow_profiles, shipment, chat, analytics
 
 app = FastAPI(title="AI-driven ERP for SMEs", version="1.0.0")
 
@@ -36,6 +36,7 @@ app.include_router(shadow_profiles.router)
 # ÇÖZÜM: 'shipping.router' yerine 'shipment.router' eklendi
 app.include_router(shipment.router)
 app.include_router(chat.router)
+app.include_router(analytics.router)
 
 @app.get("/")
 async def root():

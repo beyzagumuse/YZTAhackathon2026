@@ -23,7 +23,7 @@ export default function CategoryGrid({ onCategorySelect, selectedCategory }: Cat
   useEffect(() => {
     fetch('http://localhost:8000/products/categories')
       .then(r => r.json())
-      .then(data => setCategories(Array.isArray(data) ? data : []))
+      .then(data => setCategories(Array.isArray(data) ? data.filter((c: any) => c.name !== 'SİGARA' && c.name !== 'SIGARA') : []))
       .catch(() => {});
   }, []);
 

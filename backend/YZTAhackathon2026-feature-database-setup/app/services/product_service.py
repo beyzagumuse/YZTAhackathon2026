@@ -13,12 +13,12 @@ async def list_products():
 
 
 async def get_categories():
-    """Return distinct descriptions (used as categories) with product counts."""
+    """Return distinct categories with product counts."""
     try:
-        res = supabase_client.table("products").select("description").execute()
+        res = supabase_client.table("products").select("category").execute()
         counts: dict = {}
         for r in res.data:
-            cat = r.get("description")
+            cat = r.get("category")
             if cat:
                 counts[cat] = counts.get(cat, 0) + 1
         return [{"name": name, "count": count} for name, count in sorted(counts.items())]
@@ -27,13 +27,13 @@ async def get_categories():
 
 
 async def search_products(q: str = "", category: str = ""):
-    """Search products by name (ilike) and optionally filter by description/category."""
+    """Search products by name (ilike) and optionally filter by category."""
     try:
         query = supabase_client.table("products").select("*")
         if q:
             query = query.ilike("name", f"%{q}%")
         if category:
-            query = query.eq("description", category)
+            query = query.eq("category", category)
         res = query.execute()
         return res.data
     except Exception as e:

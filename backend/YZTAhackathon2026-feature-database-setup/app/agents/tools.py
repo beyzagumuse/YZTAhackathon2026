@@ -11,7 +11,7 @@ def check_stock_and_price(product_name: str) -> str:
     Müşteriler ürünlerin stokta olup olmadığını veya fiyatını sorduğunda bu aracı kullanın.
     """
     try:
-        # 1. Tüm ürünleri çek ve Python'da Türkçe destekli esnek arama yap
+        # Bütün ürünleri çekip Python tarafında eşleşme arıyoruz
         res = supabase_client.table("products").select("id, name, price").execute()
         
         if not res.data:
@@ -21,7 +21,7 @@ def check_stock_and_price(product_name: str) -> str:
         matched_product = None
         
         for p in res.data:
-            # "salkım" kelimesi "SALKIM DOMATES" içinde geçiyor mu diye kontrol eder
+            # Aranan kelime, ürünün adının içinde geçiyorsa eşleşmeyi kabul et
             if search_term in normalize_tr(p["name"]):
                 matched_product = p
                 break
@@ -29,7 +29,7 @@ def check_stock_and_price(product_name: str) -> str:
         if not matched_product:
             return f"Maalesef stoklarımızda '{product_name}' kelimesini içeren bir ürün bulamadım."
         
-        # 2. Ürünün stok bilgisini inventory tablosundan çek
+        # Ürünün stok bilgisini inventory tablosundan çek
         inv_res = supabase_client.table("inventory").select("quantity").eq("product_id", matched_product["id"]).execute()
         stock = inv_res.data[0]["quantity"] if inv_res.data else 0
         
@@ -44,16 +44,26 @@ def get_order_status(order_id: str) -> str:
     Müşteriler 'Siparişim nerede?', 'Kargom ne zaman gelir?' gibi sorularla sipariş numarası verdiğinde bu aracı kullanın.
     """
     try:
-        # 1. Sipariş genel bilgisini çek
-        order_res = supabase_client.table("orders").select("id, status, total_amount").eq("id", order_id).execute()
+        # 1. Kullanıcının girdiği ID'den '#' işaretini ve boşlukları temizle, küçük harfe çevir
+        clean_id = order_id.replace("#", "").strip().lower()
         
-        if not order_res.data:
+        # 2. Bütün siparişleri çekip Python tarafında eşleşme arıyoruz 
+        all_orders = supabase_client.table("orders").select("id, status, total_amount").execute()
+        
+        matched_order = None
+        for o in all_orders.data:
+            # Eğer veritabanındaki uzun ID, kullanıcının girdiği kısa ID ile başlıyorsa eşleşme sağlanır
+            if o["id"].lower().startswith(clean_id) or clean_id in o["id"].lower():
+                matched_order = o
+                break
+                
+        if not matched_order:
             return f"Sistemde '{order_id}' numaralı bir sipariş bulunamadı. Lütfen numarayı kontrol etmesini isteyin."
         
-        order = order_res.data[0]
+        full_order_id = matched_order["id"]
         
-        # 2. Siparişe ait Kargo (Shipping) bilgisini çek
-        shipping_res = supabase_client.table("shipping").select("carrier_name, tracking_number, status, estimated_delivery").eq("order_id", order_id).execute()
+        # 3. Siparişe ait Kargo (Shipping) bilgisini tam ID ile çek
+        shipping_res = supabase_client.table("shipping").select("carrier_name, tracking_number, status, estimated_delivery").eq("order_id", full_order_id).execute()
         
         if shipping_res.data:
             ship = shipping_res.data[0]
@@ -61,7 +71,7 @@ def get_order_status(order_id: str) -> str:
         else:
             shipping_info = "\nHenüz kargo çıkışı yapılmamış veya kargo atanmamış."
         
-        return f"Sipariş Durumu: {order['status']} (Tutar: {order['total_amount']} TL){shipping_info}"
+        return f"Sipariş Durumu: {matched_order['status']} (Tutar: {matched_order['total_amount']} TL){shipping_info}"
     
     except Exception as e:
         return f"Sipariş sorgulanırken veritabanında bir hata oluştu: {str(e)}"
@@ -87,9 +97,9 @@ def list_user_orders(customer_id: str) -> str:
             # Tarihi okunabilir formata çevir (Örn: 2026-05-12)
             date_str = order['created_at'].split('T')[0]
             # Kısa ID (Kullanıcı seçerken kolaylık olsun diye ilk bölüm)
-            short_id = order['id'].split('-')[0]
+            short_id = order['id'].split('-')[0].upper()
             
-            orders_text += f"{i+1}. Sipariş -> Tam ID: {order['id']} | Kısa ID: {short_id} | Tarih: {date_str} | Tutar: {order['total_amount']} TL | Durum: {order['status']}\n"
+            orders_text += f"{i+1}. Sipariş -> Tam ID: {order['id']} | Kısa ID: #{short_id} | Tarih: {date_str} | Tutar: {order['total_amount']} TL | Durum: {order['status']}\n"
         
         return orders_text
     except Exception as e:

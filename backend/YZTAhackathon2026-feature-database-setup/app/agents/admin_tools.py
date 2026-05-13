@@ -1,5 +1,29 @@
 from app.core.supabase_client import supabase_client
 
+
+def get_anomalies() -> str:
+    """
+    Stok miktarı emniyet stoğunun (reorder point) altında olan ürünleri listeler.
+    Anomali, kritik stok uyarısı, yeniden sipariş noktası, reorder point sorularında kullan.
+    """
+    try:
+        items = supabase_client.table("inventory").select("quantity, safety_stock, products(name)").execute().data or []
+        anomalies = [
+            i for i in items
+            if (i.get("safety_stock") or 0) > 0
+            and (i.get("quantity") or 0) < (i.get("safety_stock") or 0)
+        ]
+        if not anomalies:
+            return "Şu an anomali tespit edilmedi: tüm ürünlerin stoğu emniyet seviyesinin üzerinde."
+        lines = [
+            f"- {(i.get('products') or {}).get('name', '?')}: stok={i['quantity']}, emniyet stoğu={i['safety_stock']} (fark: {i['safety_stock'] - i['quantity']})"
+            for i in sorted(anomalies, key=lambda x: x["safety_stock"] - x["quantity"], reverse=True)
+        ]
+        return f"Emniyet stoğu altında {len(anomalies)} ürün (anomali):\n" + "\n".join(lines)
+    except Exception as e:
+        return f"Anomali verisi alınamadı (hata: {type(e).__name__}: {e})"
+
+
 def get_sales_ranking(order: str = "desc", limit: int = 5) -> str:
     """
     Ürünleri toplam satış adedine göre sıralar ve listeler.
@@ -100,27 +124,12 @@ def get_product_detail(product_name: str) -> str:
     Kullanıcı belirli bir ürün adı söylediğinde kullan.
     """
     try:
-        # GÜNCELLEME: Tüm ürünleri çekip Python'da normalize ederek karşılaştırıyoruz
-        res = supabase_client.table("products").select("id, name, price").execute()
+        res = supabase_client.table("products").select("id, name, price").ilike("name", f"%{product_name}%").execute()
         if not res.data:
-            return f"'{product_name}' kelimesiyle eşleşen ürün bulunamadı."
-        
-        def normalize_tr(text: str) -> str:
-            if not text: return ""
-            return text.replace("I", "ı").replace("İ", "i").replace("Ğ", "ğ").replace("Ü", "ü").replace("Ş", "ş").replace("Ö", "ö").replace("Ç", "ç").lower()
-        
-        search_term = normalize_tr(product_name)
-        matched_product = None
-        
-        for p in res.data:
-            if search_term in normalize_tr(p["name"]):
-                matched_product = p
-                break
+            return f"'{product_name}' adında ürün bulunamadı."
 
-        if not matched_product:
-            return f"'{product_name}' kelimesini içeren bir ürün bulunamadı."
-
-        pid = matched_product["id"]
+        product = res.data[0]
+        pid = product["id"]
 
         inv = supabase_client.table("inventory").select("quantity").eq("product_id", pid).execute()
         stock = inv.data[0]["quantity"] if inv.data else 0
@@ -129,102 +138,188 @@ def get_product_detail(product_name: str) -> str:
         total_sold = sum(i.get("quantity", 0) for i in sold_res)
 
         return (
-            f"Ürün: {matched_product['name']}\n"
-            f"Fiyat: {matched_product['price']} TL\n"
+            f"Ürün: {product['name']}\n"
+            f"Fiyat: {product['price']} TL\n"
             f"Mevcut stok: {stock} adet\n"
             f"Toplam satılan: {total_sold} adet"
         )
     except Exception as e:
         return f"Ürün detayı alınamadı (hata: {type(e).__name__}: {e})"
 
+
 def list_all_orders_for_admin() -> str:
     """
-    Sistemdeki tüm siparişleri, müşteri isimleri ve durumları ile birlikte listeler.
-    Admin 'tüm siparişleri göster' veya 'toplam satışlar' dediğinde bu aracı kullanın.
+    Sistemdeki tüm siparişleri müşteri isimleri ve durumlarıyla listeler.
+    Admin 'tüm siparişleri göster', 'hangi müşteri sipariş verdi' gibi sorularda kullan.
     """
     try:
-        # Tüm siparişleri profilleriyle (join) birlikte çekiyoruz
         res = supabase_client.table("orders").select("*, profiles(full_name, email)").order("created_at", desc=True).execute()
-        
         if not res.data:
             return "Sistemde henüz hiç sipariş bulunmuyor."
-        
-        output = "TÜM SİPARİŞLER LİSTESİ:\n"
+        output = "Tüm siparişler:\n"
         for o in res.data:
-            customer = o.get('profiles', {}).get('full_name', 'Bilinmeyen')
-            output += f"- ID: {o['id']} | Müşteri: {customer} | Tutar: {o['total_amount']} TL | Durum: {o['status']} | Tarih: {o['created_at'].split('T')[0]}\n"
-        
+            customer = (o.get("profiles") or {}).get("full_name", "Bilinmeyen")
+            output += f"- {o['id'][:8]} | {customer} | {o['total_amount']} TL | {o['status']} | {o['created_at'].split('T')[0]}\n"
         return output
     except Exception as e:
-        return f"Sipariş listesi çekilirken hata: {str(e)}"
+        return f"Sipariş listesi alınamadı (hata: {type(e).__name__}: {e})"
+
 
 def get_inventory_report() -> str:
     """
-    Tüm ürünlerin stok miktarlarını ve kritik seviyenin altındakileri raporlar.
+    Tüm ürünlerin stok miktarlarını ve emniyet stoğu durumunu raporlar.
+    Detaylı stok raporu, tam envanter listesi sorularında kullan.
     """
     try:
-        res = supabase_client.table("inventory").select("*, products(name)").execute()
-        if not res.data: return "Stok verisi bulunamadı."
-        
-        report = "GÜNCEL STOK RAPORU:\n"
+        res = supabase_client.table("inventory").select("quantity, safety_stock, products(name)").execute()
+        if not res.data:
+            return "Stok verisi bulunamadı."
+        lines = []
         for item in res.data:
-            name = item.get('products', {}).get('name', 'Bilinmeyen')
-            qty = item['quantity']
-            status = " [KRİTİK]" if qty < 10 else "" # Örnek kritik eşik
-            report += f"- {name}: {qty} adet {status}\n"
-        return report
+            name = (item.get("products") or {}).get("name", "?")
+            qty = item.get("quantity", 0)
+            safety = item.get("safety_stock", 0)
+            flag = " [ANOMALİ]" if safety > 0 and qty < safety else (" [KRİTİK]" if qty <= 5 else "")
+            lines.append(f"- {name}: {qty} adet (emniyet: {safety}){flag}")
+        return "Stok raporu:\n" + "\n".join(lines)
     except Exception as e:
-        return f"Stok raporu hatası: {str(e)}"
+        return f"Stok raporu alınamadı (hata: {type(e).__name__}: {e})"
+
 
 def list_all_customers() -> str:
     """
-    Sistemdeki tüm kayıtlı kullanıcıların listesini ve iletişim bilgilerini getirir.
+    Sistemdeki tüm kayıtlı müşterileri listeler.
+    Müşteri sayısı, müşteri listesi, kim kayıtlı sorularında kullan.
     """
     try:
         res = supabase_client.table("profiles").select("full_name, email, address").execute()
-        if not res.data: return "Müşteri kaydı bulunamadı."
-        
-        output = "KAYITLI MÜŞTERİLER:\n"
+        if not res.data:
+            return "Kayıtlı müşteri bulunamadı."
+        output = f"Kayıtlı müşteriler ({len(res.data)} kişi):\n"
         for c in res.data:
-            output += f"- {c['full_name']} ({c['email']}) - Adres: {c['address']}\n"
+            output += f"- {c['full_name']} ({c['email']})\n"
         return output
     except Exception as e:
-        return f"Müşteri listesi hatası: {str(e)}"
+        return f"Müşteri listesi alınamadı (hata: {type(e).__name__}: {e})"
 
 
-def get_anomalies() -> str:
+def get_slow_moving_products() -> str:
     """
-    Stok anomalileri, emniyet stoğu altında veya yeniden sipariş noktası seviyesinde ürünleri listeler.
-    Anomali, emniyet stoğu, reorder point, yeniden sipariş sorularında kullan.
+    Son 30 günde satılmayan veya çok az satılan ürünleri tespit eder ve kampanya önerisi sunar.
+    Hareketsiz stok, satılmayan ürün, stok devir hızı, kampanya önerisi, promosyon önerisinde kullan.
     """
+    from datetime import datetime, timezone, timedelta
     try:
-        # Emniyet stoğu eşiği (safety stock threshold)
-        SAFETY_STOCK = 10
-        # Yeniden sipariş noktası (reorder point)
-        REORDER_POINT = 5
-        
-        items = supabase_client.table("inventory").select("quantity, products(name)").execute().data or []
-        
-        if not items:
-            return "Stok verisi bulunamadı."
-        
-        anomalies = []
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+
+        items = (
+            supabase_client.table("order_items")
+            .select("product_id, quantity, orders(created_at)")
+            .execute().data or []
+        )
+        recent_sales: dict = {}
         for item in items:
-            qty = item.get("quantity", 0)
-            name = (item.get("products") or {}).get("name", "?")
-            
-            if qty <= REORDER_POINT:
-                anomalies.append((name, qty, "Yeniden sipariş gerekli!"))
-            elif qty <= SAFETY_STOCK:
-                anomalies.append((name, qty, "Emniyet stoğu altında"))
-        
-        if not anomalies:
-            return "Stok anomalisi yok. Tüm ürünler normal seviyelerde."
-        
-        output = f"STOK ANOMALİLERİ ({len(anomalies)} ürün):\n"
-        for name, qty, status in sorted(anomalies, key=lambda x: x[1]):
-            output += f"- {name}: {qty} adet - {status}\n"
-        
-        return output
+            if (item.get("orders") or {}).get("created_at", "") >= cutoff:
+                pid = item.get("product_id")
+                recent_sales[pid] = recent_sales.get(pid, 0) + (item.get("quantity") or 0)
+
+        inv = (
+            supabase_client.table("inventory")
+            .select("product_id, quantity, products(name, price)")
+            .execute().data or []
+        )
+
+        slow_movers = []
+        for row in inv:
+            pid = row.get("product_id")
+            qty = row.get("quantity", 0)
+            product = row.get("products") or {}
+            name = product.get("name", "?")
+            price = float(product.get("price") or 0)
+            sold_30d = recent_sales.get(pid, 0)
+            if qty > 5 and sold_30d < 3:
+                slow_movers.append({
+                    "name": name, "stock": qty,
+                    "sold_30d": sold_30d,
+                    "stock_value": qty * price,
+                })
+
+        if not slow_movers:
+            return "Son 30 günde hareketsiz ürün yok, tüm stoklar aktif satışta."
+
+        slow_movers.sort(key=lambda x: x["stock_value"], reverse=True)
+        total_value = sum(p["stock_value"] for p in slow_movers)
+
+        lines = [
+            f"- {p['name']}: {p['stock']} adet stok, 30 günde {p['sold_30d']} satış, stok değeri {p['stock_value']:,.0f} TL"
+            for p in slow_movers[:8]
+        ]
+        result = f"Hareketsiz stok tespiti ({len(slow_movers)} ürün, toplam stok değeri {total_value:,.0f} TL):\n"
+        result += "\n".join(lines)
+        result += (
+            "\n\nKampanya Önerisi: "
+            "Bu ürünler için %15-20 indirim kampanyası, bundle teklifi (birlikte al tasarruf et) "
+            "veya öne çıkarma aksiyonu ile stok devir hızı artırılabilir. "
+            "En yüksek stok değerine sahip ürünlere öncelik verin."
+        )
+        return result
     except Exception as e:
-        return f"Anomali analizi hatası: {str(e)}"
+        return f"Hareketsiz stok analizi yapılamadı (hata: {type(e).__name__}: {e})"
+
+
+def get_full_anomaly_report() -> str:
+    """
+    Tüm anomali türlerini tek raporda sunar: emniyet stoğu ihlali, kritik stok (<=2),
+    bekleyen sipariş yığılması (>%40), hareketsiz stok (30 günde satış yok).
+    Genel anomali raporu, sistem durumu, ne sorun var, risk analizi sorularında kullan.
+    """
+    from datetime import datetime, timezone, timedelta
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff_30d = (now - timedelta(days=30)).isoformat()
+        parts = []
+
+        inv = supabase_client.table("inventory").select("product_id, quantity, safety_stock, products(name)").execute().data or []
+
+        # Safety stock breaches
+        safety_breach = [
+            i for i in inv
+            if (i.get("safety_stock") or 0) > 0
+            and (i.get("quantity") or 0) < (i.get("safety_stock") or 0)
+        ]
+        if safety_breach:
+            lines = [
+                f"  - {(i.get('products') or {}).get('name','?')}: {i['quantity']}/{i['safety_stock']} (eksik: {i['safety_stock']-i['quantity']})"
+                for i in sorted(safety_breach, key=lambda x: (x.get("safety_stock") or 0) - (x.get("quantity") or 0), reverse=True)[:5]
+            ]
+            parts.append(f"Emniyet stoğu ihlali ({len(safety_breach)} ürün):\n" + "\n".join(lines))
+
+        # Critical stock
+        safety_pids = {i.get("product_id") for i in safety_breach}
+        critical = [i for i in inv if (i.get("quantity") or 0) <= 2 and i.get("product_id") not in safety_pids]
+        if critical:
+            names = ", ".join((i.get("products") or {}).get("name", "?") for i in critical[:5])
+            parts.append(f"Kritik stok (<=2 adet): {names}")
+
+        # Pending overload
+        orders = supabase_client.table("orders").select("status").execute().data or []
+        if orders:
+            pending = sum(1 for o in orders if o.get("status") == "pending")
+            ratio = pending / len(orders)
+            if ratio > 0.40:
+                parts.append(f"Bekleyen sipariş yığılması: {pending}/{len(orders)} sipariş bekliyor (%{ratio*100:.0f})")
+
+        # Slow movers
+        recent = supabase_client.table("order_items").select("product_id, orders(created_at)").execute().data or []
+        sold_ids = {i["product_id"] for i in recent if (i.get("orders") or {}).get("created_at", "") >= cutoff_30d}
+        slow = [i for i in inv if (i.get("quantity") or 0) > 10 and i.get("product_id") not in sold_ids]
+        if slow:
+            names = ", ".join((i.get("products") or {}).get("name", "?") for i in slow[:5])
+            parts.append(f"Hareketsiz stok (30 günde sıfır satış, >10 adet): {names}{'...' if len(slow) > 5 else ''}")
+
+        if not parts:
+            return "Sistem sağlıklı, kritik anomali tespit edilmedi."
+
+        return "Anomali Raporu:\n\n" + "\n\n".join(parts)
+    except Exception as e:
+        return f"Anomali raporu alınamadı (hata: {type(e).__name__}: {e})"

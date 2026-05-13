@@ -13,7 +13,6 @@ import CustomerView from './components/dashboard/CustomerView';
 import AddProductView from './components/dashboard/AddProductView';
 import AdminOrdersView from './components/dashboard/AdminOrdersView';
 import AdminStockView from './components/dashboard/AdminStockView';
-import AdminProductsView from './components/dashboard/AdminProductsView';
 import ChatWidget from './components/marketplace/ChatWidget';
 
 type Role = 'admin' | 'kayıtlıuser';
@@ -95,8 +94,6 @@ export default function SmartOpsDashboard() {
   const [cart, setCart] = useState<any[]>([]);
   const [orderVersion, setOrderVersion] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
 
   useEffect(() => { setIsReady(true); }, []);
   if (!isReady) return null;
@@ -138,11 +135,10 @@ export default function SmartOpsDashboard() {
         setUserName(json.user.full_name || json.user.email.split('@')[0]);
         setShowAuth(false);
         
-        // Adminse otomatik Panel açılsın
         if (json.role === 'admin') {
           setCurrentView('panel');
         } else if (currentView === 'cart') {
-          submitOrderToBackend(json.user.id); // Kullanıcı sepetteyken girdiyse siparişi at
+          submitOrderToBackend(json.user.id);
         } else {
           setCurrentView('home');
         }
@@ -179,21 +175,38 @@ export default function SmartOpsDashboard() {
     const orderPayload = {
       customer_id: customerId,
       address: address,
-      items: cart.map(item => ({ product_id: item.id.toString(), quantity: item.quantity, unit_price_at_sale: item.price }))
+      items: cart.map(item => ({ 
+        product_id: item.id.toString(), 
+        quantity: item.quantity, 
+        unit_price_at_sale: item.price 
+      }))
     };
 
-    const res = await fetch("http://localhost:8000/orders/create", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(orderPayload)
-    });
+    try {
+      const res = await fetch("http://localhost:8000/orders/create", {
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify(orderPayload)
+      });
 
-    if (res.ok) {
-      alert("Sipariş başarıyla alındı!");
-      setCart([]);
-      setShowAuth(false);
-      setCurrentView('home');
-      setOrderVersion(v => v + 1);
-    } else {
-      alert("Siparişte bir hata oluştu.");
+      if (res.ok) {
+        const createdOrder = await res.json();
+        
+        // HATA BURADAYDI: createdOrder.id yerine createdOrder.order_id kullanmalıyız!
+        const orderShortId = createdOrder.order_id.slice(0, 8).toUpperCase();
+
+        alert(`Siparişiniz başarıyla alındı! \n\nSipariş Numaranız: #${orderShortId} \n\nLütfen bu numarayı not edin, chatbot üzerinden sipariş durumunuzu bu numara ile sorgulayabilirsiniz.`);
+        
+        setCart([]);
+        setShowAuth(false);
+        setCurrentView('home');
+        setOrderVersion(v => v + 1);
+      } else {
+        const errorData = await res.json();
+        alert(`Siparişte bir hata oluştu: ${errorData.detail || 'Bilinmeyen hata'}`);
+      }
+    } catch (error) {
+      alert("Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.");
     }
   };
 
@@ -202,21 +215,13 @@ export default function SmartOpsDashboard() {
     return (
       <div className="min-h-screen bg-white font-sans text-slate-900">
         <Navbar isLoggedIn={isLoggedIn} userName={userName} cartCount={cart.length}
-          onAuthClick={(view: any) => { setAuthView(view); setShowAuth(true); }}
-          onLogout={() => { setIsLoggedIn(false); setRole('kayıtlıuser'); setUserName(""); setCurrentView('home'); }}
+          onAuthClick={(view: any) => { setAuthView(view); setShowAuth(true); }} 
+          onLogout={handleLogout}
           onNavigateToPanel={() => setCurrentView('panel')} onCartClick={() => setCurrentView('cart')} onHomeClick={() => setCurrentView('home')}
-          searchQuery={searchQuery} onSearch={(q: string) => { setSearchQuery(q); setSelectedCategory(''); }}
         />
         <main className="p-8 md:p-12 max-w-7xl mx-auto">
           {currentView === 'home' ? (
-            <>
-              <Hero onStartClick={() => window.scrollTo({ top: 700, behavior: 'smooth' })} />
-              <CategoryGrid
-                selectedCategory={selectedCategory}
-                onCategorySelect={(cat: string) => { setSelectedCategory(cat); setSearchQuery(''); }}
-              />
-              <ProductGrid onAddToCart={handleAddToCart} searchQuery={searchQuery} selectedCategory={selectedCategory} />
-            </>
+            <><Hero onStartClick={() => window.scrollTo({ top: 700, behavior: 'smooth' })} /><CategoryGrid /><ProductGrid onAddToCart={handleAddToCart} /></>
           ) : (
             <CartView cart={cart} removeFromCart={handleRemoveFromCart} onContinueShopping={() => setCurrentView('home')}
               onCheckout={() => {
@@ -238,17 +243,16 @@ export default function SmartOpsDashboard() {
   // RENDER - YÖNETİM PANELİ (ERP)
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
-      <Sidebar role={role} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={() => {setIsLoggedIn(false); setRole('kayıtlıuser'); setCurrentView('home');}} />
+      <Sidebar role={role} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <main className="flex-1 overflow-y-auto p-12 bg-white rounded-l-[48px] shadow-2xl border-l border-slate-100 relative">
         <button onClick={() => setCurrentView('home')} className="mb-6 flex items-center gap-2 text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-all">← Mağazaya Geri Dön</button>
         <Header role={role} />
         <div className="mt-8">
-          {activeTab === 'panel'          ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
-          : activeTab === 'admin-orders'   ? ( <AdminOrdersView /> )
-          : activeTab === 'admin-stock'    ? ( <AdminStockView /> )
-          : activeTab === 'admin-products' ? ( <AdminProductsView /> )
-          : activeTab === 'add-product'    ? ( <AddProductView /> )
-          : activeTab === 'orders'         ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
+          {activeTab === 'panel'        ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
+          : activeTab === 'admin-orders' ? ( <AdminOrdersView /> )
+          : activeTab === 'admin-stock'  ? ( <AdminStockView /> )
+          : activeTab === 'add-product'  ? ( <AddProductView /> )
+          : activeTab === 'orders'       ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
           : (
              <div className="p-20 text-center border-2 border-dashed border-slate-100 rounded-[48px]"><h2 className="text-2xl font-black text-slate-300 uppercase">{(activeTab || 'PANEL').replace('-', ' ')} Modülü</h2></div>
           )}

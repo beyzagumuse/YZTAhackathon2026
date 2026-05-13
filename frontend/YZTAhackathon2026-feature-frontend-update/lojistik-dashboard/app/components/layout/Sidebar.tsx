@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, Settings, ShoppingBag, LogOut, PackagePlus, Truck, Package, Edit3 } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, ShoppingBag, LogOut, PackagePlus, Truck, Package, Edit3, BarChart2 } from 'lucide-react';
 
 export default function Sidebar({ role, activeTab, setActiveTab, onLogout }: any) {
   const btn = (tab: string, icon: React.ReactNode, label: string) => (
@@ -29,6 +29,7 @@ export default function Sidebar({ role, activeTab, setActiveTab, onLogout }: any
             {btn('admin-stock',    <Truck size={18}/>,      'Stok')}
             {btn('admin-products', <Edit3 size={18}/>,      'Ürünleri Düzenle')}
             {btn('add-product',    <PackagePlus size={18}/>, 'Ürün Ekle')}
+            {btn('analytics',    <BarChart2 size={18}/>, 'Analitik & CRM')}
             {btn('users',        <Users size={18}/>,   'Kullanıcılar')}
             {btn('settings',     <Settings size={18}/>, 'Ayarlar')}
           </>
