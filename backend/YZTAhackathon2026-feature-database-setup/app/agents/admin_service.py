@@ -12,6 +12,7 @@ from app.agents.admin_tools import (
     list_all_customers,
     get_slow_moving_products,
     get_full_anomaly_report,
+    get_pending_order_details,
 )
 from typing import Dict, List
 import httpx
@@ -32,6 +33,7 @@ KURALLAR:
 8. Yıldız (*) veya diyez (#) gibi markdown karakteri kullanma, düz metin yaz.
 9. Hareketsiz stok, satılmayan ürün, kampanya önerisi sorularında DAİMA 'get_slow_moving_products' aracını kullan.
 10. Genel anomali raporu, sistem durumu, risk analizi, ne sorun var sorularında DAİMA 'get_full_anomaly_report' aracını kullan.
+11. Kargoya verilmemiş sipariş, bekleyen sipariş içeriği, en güncel sipariş, hazırlanan sipariş sorularında DAİMA 'get_pending_order_details' aracını kullan.
 """
 
 model = genai.GenerativeModel(
@@ -42,6 +44,7 @@ model = genai.GenerativeModel(
         get_product_detail, get_anomalies,
         list_all_orders_for_admin, get_inventory_report, list_all_customers,
         get_slow_moving_products, get_full_anomaly_report,
+        get_pending_order_details,
     ],
 )
 

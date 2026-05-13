@@ -1,6 +1,61 @@
 from app.core.supabase_client import supabase_client
 
 
+def get_pending_order_details(order_index: int = 1) -> str:
+    """
+    Kargoya verilmemiş (pending veya hazırlanıyor) siparişleri listeler ve içeriklerini gösterir.
+    'Kargoya vermediğim sipariş', 'en güncel sipariş', 'bekleyen sipariş içeriği', 'hazırlanan sipariş'
+    gibi sorularda kullan.
+    order_index: 1 = en yeni, 2 = ikinci en yeni, vb. Varsayılan 1.
+    """
+    try:
+        orders = (
+            supabase_client.table("orders")
+            .select("id, status, total_amount, created_at, profiles(full_name, email)")
+            .eq("status", "pending")
+            .order("created_at", desc=True)
+            .execute()
+            .data or []
+        )
+        if not orders:
+            return "Şu an kargoya verilmemiş (bekleyen) sipariş bulunmuyor."
+
+        idx = max(0, min(order_index - 1, len(orders) - 1))
+        order = orders[idx]
+        oid = order["id"]
+        customer = (order.get("profiles") or {}).get("full_name") or (order.get("profiles") or {}).get("email", "Bilinmeyen")
+        date = order.get("created_at", "")[:10]
+
+        items_res = (
+            supabase_client.table("order_items")
+            .select("quantity, unit_price_at_sale, products(name)")
+            .eq("order_id", oid)
+            .execute()
+            .data or []
+        )
+
+        if not items_res:
+            items_text = "  (ürün detayı bulunamadı)"
+        else:
+            lines = [
+                f"  - {(it.get('products') or {}).get('name', '?')}: {it['quantity']} adet × {it['unit_price_at_sale']} TL"
+                for it in items_res
+            ]
+            items_text = "\n".join(lines)
+
+        total = order.get("total_amount", 0)
+        short_id = oid[:8].upper()
+        return (
+            f"Bekleyen sipariş #{short_id} ({idx + 1}. sıra, {date}):\n"
+            f"Müşteri: {customer}\n"
+            f"İçerik:\n{items_text}\n"
+            f"Toplam: {total} TL\n"
+            f"(Toplam {len(orders)} bekleyen sipariş var)"
+        )
+    except Exception as e:
+        return f"Sipariş detayı alınamadı (hata: {type(e).__name__}: {e})"
+
+
 def get_anomalies() -> str:
     """
     Stok miktarı emniyet stoğunun (reorder point) altında olan ürünleri listeler.
