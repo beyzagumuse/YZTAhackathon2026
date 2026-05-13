@@ -13,6 +13,8 @@ import CustomerView from './components/dashboard/CustomerView';
 import AddProductView from './components/dashboard/AddProductView';
 import AdminOrdersView from './components/dashboard/AdminOrdersView';
 import AdminStockView from './components/dashboard/AdminStockView';
+import AdminProductsView from './components/dashboard/AdminProductsView';
+import AdminAnalyticsView from './components/dashboard/AdminAnalyticsView';
 import ChatWidget from './components/marketplace/ChatWidget';
 
 type Role = 'admin' | 'kayıtlıuser';
@@ -94,6 +96,8 @@ export default function SmartOpsDashboard() {
   const [cart, setCart] = useState<any[]>([]);
   const [orderVersion, setOrderVersion] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
 
   useEffect(() => { setIsReady(true); }, []);
   if (!isReady) return null;
@@ -110,12 +114,19 @@ export default function SmartOpsDashboard() {
     setCart(prev => prev.filter(item => item.id !== productId));
   };
 
+<<<<<<< HEAD
   // ÇIKIŞ İŞLEMİ
+=======
+>>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
   const handleLogout = () => {
     setIsLoggedIn(false);
     setRole('kayıtlıuser');
     setUserName("");
+<<<<<<< HEAD
     setCurrentUserId(""); // Chatbot'un sıfırlanması için ID'yi temizliyoruz
+=======
+    setCurrentUserId("");
+>>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
     setCurrentView('home');
   };
 
@@ -135,10 +146,18 @@ export default function SmartOpsDashboard() {
         setUserName(json.user.full_name || json.user.email.split('@')[0]);
         setShowAuth(false);
         
+<<<<<<< HEAD
         if (json.role === 'admin') {
           setCurrentView('panel');
         } else if (currentView === 'cart') {
           submitOrderToBackend(json.user.id);
+=======
+        // Adminse otomatik Panel açılsın
+        if (json.role === 'admin') {
+          setCurrentView('panel');
+        } else if (currentView === 'cart') {
+          submitOrderToBackend(json.user.id); // Kullanıcı sepetteyken girdiyse siparişi at
+>>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
         } else {
           setCurrentView('home');
         }
@@ -215,13 +234,21 @@ export default function SmartOpsDashboard() {
     return (
       <div className="min-h-screen bg-white font-sans text-slate-900">
         <Navbar isLoggedIn={isLoggedIn} userName={userName} cartCount={cart.length}
-          onAuthClick={(view: any) => { setAuthView(view); setShowAuth(true); }} 
+          onAuthClick={(view: any) => { setAuthView(view); setShowAuth(true); }}
           onLogout={handleLogout}
           onNavigateToPanel={() => setCurrentView('panel')} onCartClick={() => setCurrentView('cart')} onHomeClick={() => setCurrentView('home')}
+          searchQuery={searchQuery} onSearch={(q: string) => { setSearchQuery(q); setSelectedCategory(''); }}
         />
         <main className="p-8 md:p-12 max-w-7xl mx-auto">
           {currentView === 'home' ? (
-            <><Hero onStartClick={() => window.scrollTo({ top: 700, behavior: 'smooth' })} /><CategoryGrid /><ProductGrid onAddToCart={handleAddToCart} /></>
+            <>
+              <Hero onStartClick={() => window.scrollTo({ top: 700, behavior: 'smooth' })} />
+              <CategoryGrid
+                selectedCategory={selectedCategory}
+                onCategorySelect={(cat: string) => { setSelectedCategory(cat); setSearchQuery(''); }}
+              />
+              <ProductGrid onAddToCart={handleAddToCart} searchQuery={searchQuery} selectedCategory={selectedCategory} />
+            </>
           ) : (
             <CartView cart={cart} removeFromCart={handleRemoveFromCart} onContinueShopping={() => setCurrentView('home')}
               onCheckout={() => {
@@ -234,7 +261,10 @@ export default function SmartOpsDashboard() {
         {showAuth && (
            <AuthPages initialView={authView} allowGuest={currentView === 'cart'} onClose={() => setShowAuth(false)} onAuthAction={handleAuthAction} />
         )}
+<<<<<<< HEAD
         {/* Chatbot'a isAdmin yetkisini gönderiyoruz */}
+=======
+>>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
         <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
       </div>
     );
@@ -248,18 +278,23 @@ export default function SmartOpsDashboard() {
         <button onClick={() => setCurrentView('home')} className="mb-6 flex items-center gap-2 text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-all">← Mağazaya Geri Dön</button>
         <Header role={role} />
         <div className="mt-8">
-          {activeTab === 'panel'        ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
-          : activeTab === 'admin-orders' ? ( <AdminOrdersView /> )
-          : activeTab === 'admin-stock'  ? ( <AdminStockView /> )
-          : activeTab === 'add-product'  ? ( <AddProductView /> )
-          : activeTab === 'orders'       ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
+          {activeTab === 'panel'          ? ( role === 'admin' ? <AdminView /> : <CustomerView role={role} /> )
+          : activeTab === 'admin-orders'   ? ( <AdminOrdersView /> )
+          : activeTab === 'admin-stock'    ? ( <AdminStockView /> )
+          : activeTab === 'admin-products' ? ( <AdminProductsView /> )
+          : activeTab === 'add-product'    ? ( <AddProductView /> )
+          : activeTab === 'analytics'      ? ( <AdminAnalyticsView /> )
+          : activeTab === 'orders'         ? ( <OrdersView customerId={currentUserId} version={orderVersion} /> )
           : (
              <div className="p-20 text-center border-2 border-dashed border-slate-100 rounded-[48px]"><h2 className="text-2xl font-black text-slate-300 uppercase">{(activeTab || 'PANEL').replace('-', ' ')} Modülü</h2></div>
           )}
         </div>
       </main>
+<<<<<<< HEAD
       
       {/* Yönetim panelinde de admin yetkili chatbot */}
+=======
+>>>>>>> 2d84526c87d5f23ec45ce35da9260ec3f887b207
       <ChatWidget customerId={isLoggedIn ? currentUserId : undefined} isAdmin={role === 'admin'} />
     </div>
   );
